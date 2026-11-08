@@ -3,7 +3,7 @@
 //! Survey calculations stay in `cadcraft-survey`; this module converts their output into native
 //! document entities while preserving survey point identifiers and descriptions as DXF XDATA.
 
-use cadcraft_doc::{Common, EntityKind, Line, Point, Polyline3d, RawTag, Space};
+use cadcraft_doc::{Common, EntityKind, Line, Point, Polyline3d, RawTag};
 use cadcraft_geom::Vec3;
 use cadcraft_survey::{SurveyDrawing, SurveyDrawingEntity};
 
@@ -46,6 +46,7 @@ pub fn import_drawing(session: &mut Session, survey: &SurveyDrawing) -> Result<u
     }
 
     let mut imported = 0usize;
+    let base_common = session.current_common();
     let drawing = session.doc_mut()?;
     for entity in &survey.entities {
         let (layer, kind, point_metadata) = match entity {
@@ -72,7 +73,7 @@ pub fn import_drawing(session: &mut Session, survey: &SurveyDrawing) -> Result<u
             ),
         };
 
-        let mut common = Common { layer: layer.clone(), ..session.current_common() };
+        let mut common = Common { layer: layer.clone(), ..base_common.clone() };
         if let Some((number, description)) = point_metadata {
             common.xdata = vec![
                 RawTag { code: 1001, value: SURVEY_XDATA_APP.into() },
@@ -91,7 +92,6 @@ pub fn import_drawing(session: &mut Session, survey: &SurveyDrawing) -> Result<u
 /// Store arbitrarily long metadata in legal-sized XDATA strings without splitting UTF-8.
 fn append_xdata_text(tags: &mut Vec<RawTag>, value: &str) {
     if value.is_empty() {
-        tags.push(RawTag { code: 1000, value: String::new() });
         return;
     }
     let mut chunk = String::new();
