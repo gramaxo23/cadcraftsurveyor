@@ -29,7 +29,7 @@ of the upper-left pixel, as specified by the world-file convention.
 
 ## Limitations / next integration work
 
-The surveying algorithms are connected to the CAD engine through `cadcraft_engine::survey`. `import_csv` parses PNEZD, PENZD or XYZ text and creates native CAD point entities; `import_drawing` creates native 3D polylines and lines for parcel, contour and TIN geometry. Survey point numbers and descriptions are attached to point entities as `CADCRAFT_SURVEY` XDATA. The adapter is callable by engine clients, but a dedicated desktop import dialog, file picker, preview, CLI command and MCP workflow are not yet implemented. The TIN triangulator
+The surveying algorithms are connected to the CAD engine through `cadcraft_engine::survey`. `import_csv` parses PNEZD, PENZD or XYZ text and creates native CAD point entities; `import_drawing` creates native 3D polylines and lines for parcel, contour and TIN geometry. Survey point numbers and descriptions are attached to point entities as `CADCRAFT_SURVEY` XDATA. The adapter is callable by engine clients, and the egui front end now exposes **Insert → Survey CSV...** with PNEZD/PENZD/XYZ selection, file-open or paste input, validation preview and import feedback. A dedicated CLI command and MCP workflow are not yet implemented. The TIN triangulator
 uses bounded Bowyer-Watson insertion (5,000 point cap) with normalised XY predicates; duplicate
 XY coordinates are rejected. Its floating-point predicates are not an exact-arithmetic guarantee
 for near-degenerate survey networks. TIN contours are emitted per triangle and can be stitched
