@@ -25,7 +25,7 @@ fn in_circumcircle(a: Vec2, b: Vec2, c: Vec2, p: Vec2) -> bool {
     let ax=a.x-p.x; let ay=a.y-p.y; let bx=b.x-p.x; let by=b.y-p.y; let cx=c.x-p.x; let cy=c.y-p.y;
     let det=(ax*ax+ay*ay)*(bx*cy-by*cx)-(bx*bx+by*by)*(ax*cy-ay*cx)+(cx*cx+cy*cy)*(ax*by-ay*bx);
     let direction=orient(a,b,c);
-    if direction>0.0 { det>PREDICATE_EPS } else { det < -PREDICATE_EPS }
+    if direction>0.0 { det > -PREDICATE_EPS } else { det < PREDICATE_EPS }
 }
 
 fn normalise(points: &[SurveyPoint]) -> Result<Vec<Vec2>,SurveyError> {
