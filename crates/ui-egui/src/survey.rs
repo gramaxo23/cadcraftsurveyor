@@ -83,7 +83,7 @@ pub fn dialog(app: &mut CadApp, ctx: &egui::Context, open: &mut bool) {
             );
 
             if let Some(error) = &form.file_error {
-                ui.colored_label(ui.visuals().error_fg_color, error);
+                ui.colored_label(ui.visuals().error_fg_color, error.as_str());
             }
 
             let preview = import_points_csv(&form.csv, form.format, form.has_header);
@@ -102,11 +102,11 @@ pub fn dialog(app: &mut CadApp, ctx: &egui::Context, open: &mut bool) {
                             }
                             ui.end_row();
                             for point in result.points.iter().take(6) {
-                                ui.label(&point.number);
+                                ui.label(point.number.as_str());
                                 ui.label(format!("{:.4}", point.x));
                                 ui.label(format!("{:.4}", point.y));
                                 ui.label(format!("{:.4}", point.elevation));
-                                ui.label(&point.description);
+                                ui.label(point.description.as_str());
                                 ui.end_row();
                             }
                         });
