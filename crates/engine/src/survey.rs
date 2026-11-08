@@ -5,7 +5,7 @@
 
 use cadcraft_doc::{Common, EntityKind, Line, Point, Polyline3d, RawTag};
 use cadcraft_geom::Vec3;
-use cadcraft_survey::{SurveyDrawing, SurveyDrawingEntity};
+use cadcraft_survey::{import_points_csv, PointFormat, SurveyDrawing, SurveyDrawingEntity};
 
 use crate::{EngineError, Result, Session};
 
@@ -89,6 +89,17 @@ pub fn import_drawing(session: &mut Session, survey: &SurveyDrawing) -> Result<u
     Ok(imported)
 }
 
+/// Parses a PNEZD, PENZD or XYZ CSV file and imports its points into the active drawing.
+///
+/// CSV parsing completes before the drawing is touched. The returned count is the number of
+/// native CAD point entities created.
+pub fn import_csv(session: &mut Session, input: &str, format: PointFormat, has_header: bool) -> Result<usize> {
+    let parsed = import_points_csv(input, format, has_header)
+        .map_err(|error| EngineError::Other(error.to_string()))?;
+    let drawing = SurveyDrawing::from_points(&parsed.points);
+    import_drawing(session, &drawing)
+}
+
 /// Store arbitrarily long metadata in legal-sized XDATA strings without splitting UTF-8.
 fn append_xdata_text(tags: &mut Vec<RawTag>, value: &str) {
     if value.is_empty() {
@@ -114,7 +125,7 @@ pub const fn xdata_application_name() -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use cadcraft_survey::{SurveyDrawing, SurveyPoint};
+    use cadcraft_survey::{PointFormat, SurveyDrawing, SurveyPoint};
 
     #[test]
     fn imports_native_entities_with_point_metadata_and_declared_layers() {
