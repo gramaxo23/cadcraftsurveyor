@@ -14,16 +14,16 @@ This checklist defines the minimum release evidence for using CADCraft on employ
 
 ## Current implementation limits
 
-The surveying branch currently provides CSV PNEZD/PENZD/XYZ point import, COGO direct/inverse calculations, infinite-line intersection, traverse closure diagnostics, Bowditch (compass-rule) traverse adjustment, basic affine fitting from exactly three controls, parcel area/perimeter, a regular-grid cut/fill calculation, world-file coordinate mapping, a bounded Bowyer-Watson TIN and contour segments, plus native CAD entity import.
+The surveying branch currently provides CSV PNEZD/PENZD/XYZ point import, PNEZD export, description-code grouping, COGO direct/inverse calculations, infinite-line intersection, traverse closure diagnostics, Bowditch adjustment, unit conversion (including distinct international and US survey feet), CRS metadata validation, a 2D least-squares similarity fit with residual summaries, a three-control affine fit, parcel area/perimeter, horizontal alignment station/offset calculations, linear vertical profiles, cross-section cut/fill areas and average-end-area volumes, stakeout deltas, a regular-grid cut/fill calculation, world-file coordinate mapping, a bounded Bowyer-Watson TIN and contour segments, plus native CAD entity import.
 
 The following are not yet sufficient for production surveying:
 
-- No explicit coordinate reference system, datum, projection, geoid model, coordinate epoch, grid-to-ground settings or unit metadata is carried through survey data.
-- The affine transform is a three-control-point exact fit; it does not provide a redundant least-squares adjustment, residuals, weights, covariance or outlier diagnostics.
+- CRS/unit metadata structures and validation now exist, but metadata is not yet persisted end-to-end in drawing/project files or enforced by every import/export path. Datum, projection, geoid and epoch transformations are not implemented. A scale-factor helper is available, but grid/ground convention and field workflow still require explicit operator configuration.
+- A redundant unweighted 2D similarity fit now reports residuals, RMS and maximum residual. It is not a weighted geodetic network adjustment and does not provide covariance, stochastic models, vertical adjustment, or robust outlier detection. The separate affine transform remains a three-control exact fit.
 - TIN predicates use floating-point tolerances and the implementation is capped at 5,000 points. Breakline constraints, surface boundaries and holes are not modelled.
 - Contour stitching is a simple endpoint walk and is not topology-aware at branches or ambiguous junctions.
 - Grid cut/fill uses four-corner cell averaging, skips incomplete cells and does not clip to a project boundary. It is not a validated TIN-to-TIN earthworks calculation.
-- CSV import supports a deliberately narrow set of formats; no instrument-specific export, field-book workflow or comprehensive import audit trail is provided.
+- CSV import supports a deliberately narrow set of formats; PNEZD export and description-code grouping are available, but instrument-specific export, field-book reduction, raw observation storage and comprehensive import audit trails are not provided.
 - World-file parsing is not a complete georeferenced raster workflow.
 - No company control dataset or independent reference calculations have been supplied or run.
 
@@ -32,10 +32,10 @@ The following are not yet sufficient for production surveying:
 - [ ] CI passes formatting, lint, unit tests, application build and supported platform builds on the exact release commit.
 - [ ] Add deterministic fixtures with documented units, CRS/datum, control coordinates and independently verified expected outputs.
 - [ ] Validate all five workstreams above with a qualified surveyor using company field/control data.
-- [ ] Add explicit units and coordinate-system metadata to projects, imports, exports and reports; reject ambiguous inputs rather than guessing.
-- [ ] Add redundant control adjustment with residual reporting before setting-out use.
+- [ ] Persist and enforce explicit units and coordinate-system metadata across projects, imports, exports and reports; reject ambiguous inputs rather than guessing.
+- [ ] Upgrade the unweighted similarity fit to a validated weighted 2D/3D network adjustment with covariance, residual tests and outlier diagnostics before setting-out use.
 - [ ] Upgrade TIN robustness and implement breaklines, boundaries and holes before relying on surfaces or derived contours.
-- [ ] Implement independently verified surface-to-surface volumes and project-boundary clipping before quantity use.
+- [ ] Implement independently verified TIN-to-TIN surface volumes, project-boundary clipping and mass-haul analysis before quantity use.
 - [ ] Verify DXF/DWG round trips preserve survey layers, point metadata and 3D geometry in the target CAD applications.
 - [ ] Produce auditable reports recording source files, import options, coordinate settings, calculation method, software version and warnings.
 - [ ] Run a supervised pilot; require sign-off before operational use.
