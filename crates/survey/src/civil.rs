@@ -325,6 +325,118 @@ impl CrossSection {
     }
 }
 
+
+/// Residual diagnostics for a redundant 2D similarity control fit.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct SimilarityFit {
+    pub scale: f64,
+    pub rotation_radians: f64,
+    pub translation: Vec2,
+    pub residuals: Vec<Vec2>,
+    pub rms: f64,
+    pub maximum_residual: f64,
+}
+
+/// Fits a 2D similarity transformation by unweighted least squares.
+/// At least two non-identical source controls are required. This is not a
+/// substitute for a weighted geodetic network adjustment.
+pub fn fit_similarity(source: &[Vec2], target: &[Vec2]) -> Result<SimilarityFit, SurveyError> {
+    if source.len() != target.len() || source.len() < 2 {
+        return Err(SurveyError::NotEnoughPoints(2));
+    }
+    if source.iter().chain(target.iter()).any(|p| !p.x.is_finite() || !p.y.is_finite()) {
+        return Err(SurveyError::InvalidValue("control coordinates must be finite".into()));
+    }
+    let n = source.len() as f64;
+    let sx = source.iter().map(|p| p.x).sum::<f64>() / n;
+    let sy = source.iter().map(|p| p.y).sum::<f64>() / n;
+    let tx = target.iter().map(|p| p.x).sum::<f64>() / n;
+    let ty = target.iter().map(|p| p.y).sum::<f64>() / n;
+    let mut dot = 0.0;
+    let mut cross = 0.0;
+    let mut denom = 0.0;
+    for (s, t) in source.iter().zip(target.iter()) {
+        let x = s.x - sx;
+        let y = s.y - sy;
+        let u = t.x - tx;
+        let v = t.y - ty;
+        dot += x * u + y * v;
+        cross += x * v - y * u;
+        denom += x * x + y * y;
+    }
+    if !denom.is_finite() || denom <= f64::EPSILON {
+        return Err(SurveyError::DegenerateControls);
+    }
+    let scale = dot.hypot(cross) / denom;
+    let rotation_radians = cross.atan2(dot);
+    let (sin, cos) = rotation_radians.sin_cos();
+    let translation = Vec2 { x: tx - scale * (cos * sx - sin * sy), y: ty - scale * (sin * sx + cos * sy) };
+    if !scale.is_finite() || scale <= 0.0 || !translation.x.is_finite() || !translation.y.is_finite() {
+        return Err(SurveyError::DegenerateControls);
+    }
+    let residuals: Vec<Vec2> = source.iter().zip(target.iter()).map(|(s, t)| {
+        let predicted = Vec2 { x: scale * (cos * s.x - sin * s.y) + translation.x, y: scale * (sin * s.x + cos * s.y) + translation.y };
+        Vec2 { x: t.x - predicted.x, y: t.y - predicted.y }
+    }).collect();
+    let sum_sq = residuals.iter().map(|r| r.x * r.x + r.y * r.y).sum::<f64>();
+    let maximum_residual = residuals.iter().map(|r| r.x.hypot(r.y)).fold(0.0, f64::max);
+    let rms = (sum_sq / n).sqrt();
+    if !rms.is_finite() || !maximum_residual.is_finite() {
+        return Err(SurveyError::InvalidValue("control residual computation overflowed".into()));
+    }
+    Ok(SimilarityFit { scale, rotation_radians, translation, residuals, rms, maximum_residual })
+}
+
+/// Average-end-area volume between two cross sections.
+pub fn average_end_area_volume(a: &CrossSection, b: &CrossSection, datum: f64) -> Result<(f64, f64), SurveyError> {
+    a.validate()?;
+    b.validate()?;
+    if !datum.is_finite() || b.station <= a.station {
+        return Err(SurveyError::InvalidValue("cross-section stations must increase and datum must be finite".into()));
+    }
+    let (cut_a, fill_a) = a.area_to_datum(datum)?;
+    let (cut_b, fill_b) = b.area_to_datum(datum)?;
+    let length = b.station - a.station;
+    let cut = (cut_a + cut_b) * 0.5 * length;
+    let fill = (fill_a + fill_b) * 0.5 * length;
+    if cut.is_finite() && fill.is_finite() { Ok((cut, fill)) } else { Err(SurveyError::InvalidValue("average-end-area volume overflowed".into())) }
+}
+
+/// Applies an explicitly supplied grid-to-ground factor to a horizontal distance.
+/// The caller is responsible for documenting whether the factor is grid/ground or ground/grid.
+pub fn apply_combined_scale_factor(distance: f64, factor: f64) -> Result<f64, SurveyError> {
+    if !distance.is_finite() || distance < 0.0 || !factor.is_finite() || factor <= 0.0 {
+        return Err(SurveyError::InvalidValue("distance and scale factor must be finite and non-negative/positive".into()));
+    }
+    let result = distance * factor;
+    if result.is_finite() { Ok(result) } else { Err(SurveyError::InvalidValue("scaled distance overflowed".into())) }
+}
+
+#[cfg(test)]
+mod additional_civil_tests {
+    use super::*;
+
+    #[test]
+    fn redundant_similarity_fit_reports_residuals() {
+        let source = [Vec2 { x: 0.0, y: 0.0 }, Vec2 { x: 10.0, y: 0.0 }, Vec2 { x: 0.0, y: 10.0 }, Vec2 { x: 10.0, y: 10.0 }];
+        let target = [Vec2 { x: 100.0, y: 200.0 }, Vec2 { x: 110.0, y: 200.0 }, Vec2 { x: 100.0, y: 210.0 }, Vec2 { x: 110.0, y: 210.0 }];
+        let fit = fit_similarity(&source, &target);
+        assert!(fit.is_ok_and(|v| v.rms < 1.0e-9 && v.maximum_residual < 1.0e-9));
+    }
+
+    #[test]
+    fn average_end_area_volume_uses_station_spacing() {
+        let section = |station| CrossSection { station, points: vec![SectionOffsetElevation { offset: -1.0, elevation: 12.0 }, SectionOffsetElevation { offset: 1.0, elevation: 12.0 }] };
+        assert_eq!(average_end_area_volume(&section(0.0), &section(10.0), 10.0), Ok((40.0, 0.0)));
+    }
+
+    #[test]
+    fn scale_factor_is_explicit_and_checked() {
+        assert_eq!(apply_combined_scale_factor(100.0, 0.9996), Ok(99.96));
+        assert!(apply_combined_scale_factor(100.0, 0.0).is_err());
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
