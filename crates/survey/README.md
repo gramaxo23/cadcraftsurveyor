@@ -28,12 +28,14 @@ of the upper-left pixel, as specified by the world-file convention.
 
 ## Limitations / next integration work
 
-This is the algorithm and data foundation, not yet a finished surveying UI. Contours are emitted
-as independent two-point segments and are not stitched into polylines. Grid volumes use the
-four-corner average for each complete cell; cells with missing corner elevations are skipped.
-The first release does not yet triangulate scattered points into a TIN, perform datum/geoid
-transformations, georeference raster image entities in a drawing, or create native CAD entities
-from imported points. Those are follow-on integration tasks and must be tested against known
-survey control data before production use.
+This is the algorithm and data foundation, not yet a finished surveying UI. The TIN triangulator
+uses bounded Bowyer-Watson insertion (5,000 point cap) with normalised XY predicates; duplicate
+XY coordinates are rejected. Its floating-point predicates are not an exact-arithmetic guarantee
+for near-degenerate survey networks. TIN contours are emitted per triangle and can be stitched
+using an endpoint tolerance, but the current stitcher follows forward endpoints only and is not a
+full branch-aware topology solver. Grid volumes use the four-corner average for each complete
+cell; cells with missing corner elevations are skipped. Datum/geoid transformations, georeferenced
+raster image entities in a drawing, and native CAD entity/UI integration remain follow-on work.
+Validate all terrain and coordinate operations against known survey control data before production use.
 
 Run the crate tests with `cargo test -p cadcraft-survey`.
