@@ -84,22 +84,30 @@ impl SurveyDrawing {
 
     /// Adds the unique edges of a TIN as line entities.
     pub fn add_tin_edges(&mut self, triangles: &[[[f64; 3]; 3]]) {
-        use std::collections::BTreeSet;
-        let mut edges = BTreeSet::new();
+        fn compare_point(a: &[f64; 3], b: &[f64; 3]) -> std::cmp::Ordering {
+            a[0].total_cmp(&b[0]).then(a[1].total_cmp(&b[1])).then(a[2].total_cmp(&b[2]))
+        }
+
+        let mut edges: Vec<([f64; 3], [f64; 3])> = Vec::new();
         for triangle in triangles {
-            for (a, b) in [(triangle[0], triangle[1]), (triangle[1], triangle[2]), (triangle[2], triangle[0])] {
-                let mut endpoints = [a, b];
-                if endpoints[1] < endpoints[0] { endpoints.swap(0, 1); }
-                edges.insert(endpoints);
+            for (mut a, mut b) in [(triangle[0], triangle[1]), (triangle[1], triangle[2]), (triangle[2], triangle[0])] {
+                if a.iter().chain(b.iter()).any(|value| !value.is_finite()) {
+                    continue;
+                }
+                if compare_point(&a, &b).is_gt() {
+                    std::mem::swap(&mut a, &mut b);
+                }
+                edges.push((a, b));
             }
         }
+        edges.sort_by(|left, right| compare_point(&left.0, &right.0).then(compare_point(&left.1, &right.1)));
+        edges.dedup_by(|left, right| left.0 == right.0 && left.1 == right.1);
         self.entities.extend(edges.into_iter().map(|edge| SurveyDrawingEntity::Line {
             layer: TIN_LAYER.to_string(),
-            start: edge[0],
-            end: edge[1],
+            start: edge.0,
+            end: edge.1,
         }));
-    }
-}
+    }}
 
 #[cfg(test)]
 mod tests {
