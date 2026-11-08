@@ -6,6 +6,7 @@
 #![forbid(unsafe_code)]
 
 pub mod cogo;
+pub mod civil;
 pub mod drawing;
 pub mod tin;
 pub use drawing::{SurveyDrawing, SurveyDrawingEntity};
