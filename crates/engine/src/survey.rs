@@ -159,7 +159,7 @@ mod tests {
     #[test]
     fn csv_import_creates_native_points_and_keeps_number_and_description() {
         let mut session = Session::new();
-        let csv = "Point,Northing,Easting,Elevation,Description\\n101,34,12,5.6,Control\\n";
+        let csv = "Point,Northing,Easting,Elevation,Description\n101,34,12,5.6,Control\n";
         assert_eq!(import_csv(&mut session, csv, PointFormat::Pnezd, true).ok(), Some(1));
         assert!(session.doc().is_ok_and(|drawing| {
             drawing.model.iter().any(|entity| {
