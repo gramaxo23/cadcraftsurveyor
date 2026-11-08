@@ -14,7 +14,7 @@ This checklist defines the minimum release evidence for using CADCraft on employ
 
 ## Current implementation limits
 
-The surveying branch currently provides CSV PNEZD/PENZD/XYZ point import, basic affine fitting from exactly three controls, parcel area/perimeter, a regular-grid cut/fill calculation, world-file coordinate mapping, a bounded Bowyer-Watson TIN and contour segments, plus native CAD entity import.
+The surveying branch currently provides CSV PNEZD/PENZD/XYZ point import, COGO direct/inverse calculations, infinite-line intersection, traverse closure diagnostics, Bowditch (compass-rule) traverse adjustment, basic affine fitting from exactly three controls, parcel area/perimeter, a regular-grid cut/fill calculation, world-file coordinate mapping, a bounded Bowyer-Watson TIN and contour segments, plus native CAD entity import.
 
 The following are not yet sufficient for production surveying:
 
