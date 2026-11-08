@@ -213,7 +213,8 @@ pub fn parcel_area(points: &[Vec2]) -> Result<f64, SurveyError> {
         }
         sum += p.x * q.y - q.x * p.y;
     }
-    Ok(sum.abs() * 0.5)
+    let area = sum.abs() * 0.5;
+    if area.is_finite() { Ok(area) } else { Err(SurveyError::InvalidValue("parcel area overflowed".into())) }
 }
 
 pub fn parcel_perimeter(points: &[Vec2]) -> Result<f64, SurveyError> {
@@ -224,6 +225,9 @@ pub fn parcel_perimeter(points: &[Vec2]) -> Result<f64, SurveyError> {
     for i in 0..points.len() {
         let p = points.get(i).ok_or(SurveyError::NotEnoughPoints(3))?;
         let q = points.get((i + 1) % points.len()).ok_or(SurveyError::NotEnoughPoints(3))?;
+        if !(p.x.is_finite() && p.y.is_finite() && q.x.is_finite() && q.y.is_finite()) {
+            return Err(SurveyError::InvalidValue("parcel has non-finite coordinates".into()));
+        }
         sum += (q.x - p.x).hypot(q.y - p.y);
     }
     if sum.is_finite() { Ok(sum) } else { Err(SurveyError::InvalidValue("parcel perimeter overflowed".into())) }
