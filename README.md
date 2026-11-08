@@ -29,7 +29,7 @@
   <img alt="Runs on macOS, Windows, Linux, FreeBSD and the web" src="https://img.shields.io/badge/runs%20on-macOS%20%C2%B7%20Windows%20%C2%B7%20Linux%20%C2%B7%20BSD%20%C2%B7%20Web-14a3c7?style=flat-square">
   <img alt="License: MIT OR Apache-2.0" src="https://img.shields.io/badge/license-MIT%20%2F%20Apache--2.0-0b6f88?style=flat-square">
   <img alt="Agent-drivable over MCP" src="https://img.shields.io/badge/agents-MCP-14a3c7?style=flat-square">
-  <img alt="Status: early development" src="https://img.shields.io/badge/status-early%20development-f07a3a?style=flat-square">
+  <img alt="Status: active development; survey features are not production certified" src="https://img.shields.io/badge/status-active%20development%20%E2%80%94%20survey%20pilot-f07a3a?style=flat-square">
   <br>
   <a href="https://sonarcloud.io/project/overview?id=storytold_cadcraft"><img alt="Scanned by SonarCloud" src="https://img.shields.io/badge/Scanned_by-SonarCloud-4b9fd5?style=flat-square&logo=sonarqubecloud&logoColor=white"></a>
   <a href="https://coderabbit.ai"><img alt="Reviewed by CodeRabbit" src="https://img.shields.io/coderabbit/prs/github/storytold/cadcraft?style=flat-square&label=Reviewed%20by%20CodeRabbit&logo=coderabbit"></a>
@@ -120,6 +120,94 @@ numbers):
 | Grips | Hot grips with Space to cycle Stretch, Move, Rotate, Scale and Mirror |
 | Interface languages | English, Ukrainian (Українська), Brazilian Portuguese (Português (Brasil)), German (Deutsch), Spanish (Español), Czech (Čeština), Russian (Русский), French (Français), Simplified Chinese (简体中文, with an installed CJK font), Italian (Italiano), Korean (한국어, with an installed Hangul font), Swedish (Svenska), Arabic (العربية, with an installed Arabic font), Hungarian (Magyar), Turkish (Türkçe), Greek (Ελληνικά), Bosnian (Bosanski) and Georgian (ქართული), live switching and a remembered Auto/system-language choice; [details](docs/localization.md) |
 | Automation | MCP server, JSON control channel, `cadcraft-cli` (info, convert, run, commands, mcp) |
+
+## Surveying and civil engineering toolkit
+
+CADCraft includes a standalone Rust surveying-analysis crate and an initial desktop point-import
+workflow. The surveying library is designed to be reusable from the CAD engine and future CLI,
+MCP and field-office workflows. It complements CAD drafting; it is **not yet a replacement for a
+validated survey adjustment package or a complete Civil 3D workflow**.
+
+### Available surveying capabilities
+
+| Workflow | Available functionality |
+|---|---|
+| Survey point data | Import PNEZD, PENZD and XYZ CSV; validate identifiers and finite coordinates; preview points before desktop import; export PNEZD CSV; group points by the first description code |
+| COGO and traverse | Direct and inverse calculations, whole-circle azimuths, infinite-line intersections, traverse closure diagnostics and Bowditch (compass-rule) adjustment |
+| Coordinate handling | Linear, area and volume unit conversions; separate international-foot and US-survey-foot definitions; CRS metadata validation; 2D affine fit from three controls; redundant unweighted 2D similarity fit with residual, RMS and maximum-residual reporting |
+| Parcels | Polygon area and perimeter calculations |
+| Terrain | Bounded Bowyer–Watson TIN, elevation queries, contour-segment generation and contour stitching; regular elevation grids and grid-based cut/fill |
+| Civil geometry | Horizontal alignment station/offset calculations, station equations, linear vertical-profile interpolation and grade calculations |
+| Cross sections | Section cut/fill area to a datum and average-end-area volume between sections |
+| Construction layout | Instrument-to-design stakeout distance, azimuth and optional elevation differences |
+| CAD integration | Convert survey drawing primitives into native CAD points, 3D polylines and lines; point numbers/descriptions are retained as `CADCRAFT_SURVEY` XDATA |
+| Desktop workflow | `Insert → Survey CSV...` supports PNEZD/PENZD/XYZ, file selection or paste, validation preview and import feedback |
+
+### Importing survey points
+
+1. Open a drawing in CADCraft.
+2. Choose **Insert → Survey CSV...**.
+3. Select PNEZD, PENZD or XYZ and indicate whether the first row is a header.
+4. Open a CSV file or paste the point records.
+5. Review the parsed point preview and any validation errors.
+6. Import only after the preview is correct.
+
+PNEZD means point number, northing, easting, elevation and description. PENZD swaps easting and
+northing. XYZ means easting, northing and elevation; point numbers are generated. Coordinates
+are interpreted in the drawing's units. Do not mix datasets with different coordinate systems
+or units.
+
+### Rust API
+
+The algorithms are available from the `cadcraft-survey` workspace crate. For example:
+
+```rust
+use cadcraft_survey::{
+    PointFormat, import_points_csv,
+    cogo,
+    civil::{LinearUnit, HorizontalAlignment, VerticalProfile, CrossSection},
+};
+
+// Parse and validate point data before using it.
+let parsed = import_points_csv(
+    "Point,Northing,Easting,Elevation,Description\n101,5000,2000,125.5,CONTROL",
+    PointFormat::Pnezd,
+    true,
+)?;
+
+// Convert a distance without conflating the two foot definitions.
+let metres = LinearUnit::UsSurveyFoot.convert(100.0, LinearUnit::Metre)?;
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+The crate documentation and tests are in [crates/survey](crates/survey/README.md).
+Run its test suite with `cargo test -p cadcraft-survey`.
+
+### Accuracy, compatibility and release status
+
+The current survey functionality is an engineering foundation and supervised evaluation
+prototype. It must not be used as the sole basis for cadastral/legal boundary certification,
+unsupervised construction setting-out, or payment quantities. In particular:
+
+- CRS metadata can be represented and validated, but authoritative datum, projection, geoid and
+  coordinate-epoch transformations are not implemented or automatically applied.
+- The redundant similarity fit is unweighted and 2D; it is not a least-squares geodetic network
+  adjustment and does not provide covariance or statistical outlier tests.
+- The TIN is bounded to 5,000 points, uses floating-point predicates, and does not yet enforce
+  breaklines, surface boundaries or holes.
+- Contour stitching is not a full topology-aware network solver.
+- Grid cut/fill uses complete four-corner cells and does not provide validated TIN-to-TIN
+  quantities or project-boundary clipping.
+- Instrument-specific field-book reduction/export, complete survey audit trails and end-to-end
+  persistence of coordinate metadata are not yet available.
+- Survey-specific DXF/DWG round-trip verification and independent company-control validation
+  remain release gates.
+
+See the [surveying production-readiness checklist](docs/surveying-production-readiness.md) for
+acceptance criteria, validation requirements and the current release decision. A successful
+software build alone is not evidence of survey accuracy.
+
+---
 
 ## Quick start
 
