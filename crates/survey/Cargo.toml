@@ -1,0 +1,13 @@
+[package]
+name = "cadcraft-survey"
+description = "Surveying and civil-site analysis tools for CADCraft"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+serde = { workspace = true }
+thiserror = { workspace = true }
