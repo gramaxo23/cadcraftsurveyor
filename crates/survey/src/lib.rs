@@ -1,12 +1,12 @@
-pub mod tin;
-pub use tin::{stitch_contours, Tin, TinContourSegment, Triangle};
-
 //! Surveying and civil-site analysis primitives for CADCraft.
 //!
 //! Coordinates are expressed in drawing units. CSV point import uses the common
 //! PNEZD convention (point, northing, easting, elevation, description) by default.
 #![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::unimplemented, clippy::todo, clippy::unreachable)]
 #![forbid(unsafe_code)]
+
+pub mod tin;
+pub use tin::{stitch_contours, Tin, TinContourSegment, Triangle};
 
 use serde::{Deserialize, Serialize};
 use std::fmt::Write as _;
