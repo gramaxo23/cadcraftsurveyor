@@ -35,8 +35,7 @@ XY coordinates are rejected. Its floating-point predicates are not an exact-arit
 for near-degenerate survey networks. TIN contours are emitted per triangle and can be stitched
 using an endpoint tolerance, but the current stitcher follows forward endpoints only and is not a
 full branch-aware topology solver. Grid volumes use the four-corner average for each complete
-cell; cells with missing corner elevations are skipped. Datum/geoid transformations, georeferenced
-raster image entities in a drawing, and native CAD entity/UI integration remain follow-on work.
+cell; cells with missing corner elevations are skipped. Datum/geoid transformations, georeferenced raster image entities in a drawing, and a dedicated CLI/MCP workflow remain follow-on work.
 Validate all terrain and coordinate operations against known survey control data before production use.
 
 Run the crate tests with `cargo test -p cadcraft-survey`.
