@@ -326,6 +326,115 @@ impl CrossSection {
 }
 
 
+
+/// A stakeout target with optional design elevation and a stable point identifier.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct StakeoutTarget {
+    pub point_number: String,
+    pub coordinate: Vec2,
+    pub elevation: Option<f64>,
+    pub description: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct StakeoutDelta {
+    pub point_number: String,
+    pub horizontal_distance: f64,
+    /// Whole-circle azimuth clockwise from north, in degrees.
+    pub azimuth_degrees: f64,
+    pub elevation_difference: Option<f64>,
+}
+
+/// Computes instrument-to-design deltas. Coordinates must already share the same CRS and units.
+pub fn stakeout_deltas(instrument: Vec2, instrument_elevation: Option<f64>, targets: &[StakeoutTarget]) -> Result<Vec<StakeoutDelta>, SurveyError> {
+    if !instrument.x.is_finite() || !instrument.y.is_finite() || instrument_elevation.is_some_and(|z| !z.is_finite()) {
+        return Err(SurveyError::InvalidValue("instrument coordinate/elevation must be finite".into()));
+    }
+    if targets.is_empty() {
+        return Err(SurveyError::EmptyInput);
+    }
+    let mut result = Vec::with_capacity(targets.len());
+    for target in targets {
+        if target.point_number.trim().is_empty() || !target.coordinate.x.is_finite() || !target.coordinate.y.is_finite()
+            || target.elevation.is_some_and(|z| !z.is_finite()) {
+            return Err(SurveyError::InvalidValue("stakeout target has invalid identifier or coordinate".into()));
+        }
+        let dx = target.coordinate.x - instrument.x;
+        let dy = target.coordinate.y - instrument.y;
+        let horizontal_distance = dx.hypot(dy);
+        let azimuth_degrees = if horizontal_distance == 0.0 { 0.0 } else { dx.atan2(dy).to_degrees().rem_euclid(360.0) };
+        let elevation_difference = match (target.elevation, instrument_elevation) {
+            (Some(target_z), Some(instrument_z)) => Some(target_z - instrument_z),
+            _ => None,
+        };
+        if !horizontal_distance.is_finite() {
+            return Err(SurveyError::InvalidValue("stakeout delta overflowed".into()));
+        }
+        result.push(StakeoutDelta { point_number: target.point_number.clone(), horizontal_distance, azimuth_degrees, elevation_difference });
+    }
+    Ok(result)
+}
+
+/// Creates a CSV export in PNEZD order with RFC-4180-style quote escaping.
+pub fn export_pnezd_csv(points: &[crate::SurveyPoint]) -> Result<String, SurveyError> {
+    if points.is_empty() { return Err(SurveyError::EmptyInput); }
+    let mut output = String::from("Point,Northing,Easting,Elevation,Description\r\n");
+    for point in points {
+        point.validate()?;
+        let escaped_number = point.number.replace('"', "\"\"");
+        let escaped_description = point.description.replace('"', "\"\"");
+        let _ = std::fmt::Write::write_fmt(&mut output, format_args!(
+            "\"{}\",{:.4},{:.4},{:.4},\"{}\"\r\n",
+            escaped_number, point.y, point.x, point.elevation, escaped_description
+        ));
+    }
+    Ok(output)
+}
+
+/// Case-insensitive point-code grouping while preserving source order.
+pub fn group_points_by_code(points: &[crate::SurveyPoint]) -> Result<std::collections::BTreeMap<String, Vec<usize>>, SurveyError> {
+    let mut groups = std::collections::BTreeMap::new();
+    for (index, point) in points.iter().enumerate() {
+        point.validate()?;
+        let code = point.description.split_whitespace().next().unwrap_or("").to_ascii_uppercase();
+        if !code.is_empty() {
+            groups.entry(code).or_insert_with(Vec::new).push(index);
+        }
+    }
+    Ok(groups)
+}
+
+#[cfg(test)]
+mod survey_workflow_tests {
+    use super::*;
+    use crate::SurveyPoint;
+
+    #[test]
+    fn stakeout_calculates_bearing_distance_and_height() {
+        let target = StakeoutTarget { point_number: "101".into(), coordinate: Vec2 { x: 3.0, y: 4.0 }, elevation: Some(12.0), description: "corner".into() };
+        let result = stakeout_deltas(Vec2 { x: 0.0, y: 0.0 }, Some(10.0), &[target]);
+        assert!(result.is_ok_and(|v| (v[0].horizontal_distance - 5.0).abs() < 1e-9 && (v[0].azimuth_degrees - 36.8698976458).abs() < 1e-8 && v[0].elevation_difference == Some(2.0)));
+    }
+
+    #[test]
+    fn exports_pnezd_with_escaped_description() {
+        let points = [SurveyPoint { number: "1".into(), x: 10.0, y: 20.0, elevation: 3.0, description: "tree \"large\"".into() }];
+        let csv = export_pnezd_csv(&points);
+        assert!(csv.is_ok_and(|v| v.contains("\"tree \"\"large\"\"\"")));
+    }
+
+    #[test]
+    fn groups_points_by_field_code() {
+        let points = [
+            SurveyPoint { number: "1".into(), x: 0.0, y: 0.0, elevation: 0.0, description: "EP north".into() },
+            SurveyPoint { number: "2".into(), x: 1.0, y: 0.0, elevation: 0.0, description: "ep south".into() },
+            SurveyPoint { number: "3".into(), x: 2.0, y: 0.0, elevation: 0.0, description: "TREE".into() },
+        ];
+        let groups = group_points_by_code(&points);
+        assert!(groups.is_ok_and(|g| g.get("EP").is_some_and(|v| v.len() == 2) && g.get("TREE").is_some_and(|v| v.len() == 1)));
+    }
+}
+
 /// Residual diagnostics for a redundant 2D similarity control fit.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct SimilarityFit {
