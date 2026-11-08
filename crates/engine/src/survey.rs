@@ -110,7 +110,7 @@ mod tests {
             assert!(drawing.layer("SURVEY-POINTS").is_some());
             assert_eq!(drawing.header.str("CLAYER", "0"), "0");
             let point = drawing.model.iter().find(|entity| {
-                matches!(entity.kind, EntityKind::Point(_))
+                matches!(&entity.kind, EntityKind::Point(_))
             });
             assert!(point.is_some());
         }
