@@ -39,6 +39,7 @@ pub mod hatchdlg;
 mod mtext_editor;
 mod panel_state;
 pub mod spacemouse;
+pub mod survey;
 pub mod switch;
 // The Edit Text window, opened from the shortcut menu's Edit Text entry.
 pub mod textdlg;
