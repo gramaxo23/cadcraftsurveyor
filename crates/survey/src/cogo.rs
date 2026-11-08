@@ -9,11 +9,7 @@ const DEGREES_PER_TURN: f64 = 360.0;
 const ANGULAR_EPS: f64 = 1.0e-12;
 
 fn validate_point(point: Vec2) -> Result<(), SurveyError> {
-    if point.x.is_finite() && point.y.is_finite() {
-        Ok(())
-    } else {
-        Err(SurveyError::InvalidValue("COGO coordinate must be finite".into()))
-    }
+    if point.x.is_finite() && point.y.is_finite() { Ok(()) } else { Err(SurveyError::InvalidValue("COGO coordinate must be finite".into())) }
 }
 
 /// An inverse solution from two coordinates.
@@ -54,11 +50,7 @@ pub fn inverse(from: Vec2, to: Vec2) -> Result<InverseResult, SurveyError> {
     if !distance.is_finite() {
         return Err(SurveyError::InvalidValue("inverse distance overflowed".into()));
     }
-    let azimuth_degrees = if distance == 0.0 {
-        0.0
-    } else {
-        dx.atan2(dy).to_degrees().rem_euclid(DEGREES_PER_TURN)
-    };
+    let azimuth_degrees = if distance == 0.0 { 0.0 } else { dx.atan2(dy).to_degrees().rem_euclid(DEGREES_PER_TURN) };
     Ok(InverseResult { distance, azimuth_degrees })
 }
 
@@ -69,10 +61,7 @@ pub fn direct(start: Vec2, azimuth_degrees: f64, distance: f64) -> Result<Vec2, 
         return Err(SurveyError::InvalidValue("azimuth must be finite and distance must be finite and non-negative".into()));
     }
     let azimuth = azimuth_degrees.to_radians();
-    let result = Vec2 {
-        x: start.x + distance * azimuth.sin(),
-        y: start.y + distance * azimuth.cos(),
-    };
+    let result = Vec2 { x: start.x + distance * azimuth.sin(), y: start.y + distance * azimuth.cos() };
     validate_point(result)?;
     Ok(result)
 }
@@ -119,19 +108,8 @@ pub fn traverse_closure(start: Vec2, legs: &[TraverseLeg], known_end: Vec2) -> R
     if !linear_misclosure.is_finite() {
         return Err(SurveyError::InvalidValue("traverse misclosure overflowed".into()));
     }
-    let precision_ratio = if linear_misclosure <= f64::EPSILON * total_length.max(1.0) {
-        None
-    } else {
-        Some(total_length / linear_misclosure)
-    };
-    Ok(TraverseClosure {
-        computed_end: computed,
-        misclosure_easting,
-        misclosure_northing,
-        linear_misclosure,
-        total_length,
-        precision_ratio,
-    })
+    let precision_ratio = if linear_misclosure <= f64::EPSILON * total_length.max(1.0) { None } else { Some(total_length / linear_misclosure) };
+    Ok(TraverseClosure { computed_end: computed, misclosure_easting, misclosure_northing, linear_misclosure, total_length, precision_ratio })
 }
 
 #[cfg(test)]
@@ -157,20 +135,14 @@ mod tests {
 
     #[test]
     fn intersects_two_lines() {
-        let hit = line_intersection(
-            Vec2 { x: 0.0, y: 0.0 }, Vec2 { x: 10.0, y: 10.0 },
-            Vec2 { x: 0.0, y: 10.0 }, Vec2 { x: 10.0, y: 0.0 },
-        );
+        let hit = line_intersection(Vec2 { x: 0.0, y: 0.0 }, Vec2 { x: 10.0, y: 10.0 }, Vec2 { x: 0.0, y: 10.0 }, Vec2 { x: 10.0, y: 0.0 });
         assert_eq!(hit, Ok(Vec2 { x: 5.0, y: 5.0 }));
     }
 
     #[test]
     fn reports_traverse_misclosure_and_precision() {
         let start = Vec2 { x: 0.0, y: 0.0 };
-        let legs = [
-            TraverseLeg { azimuth_degrees: 90.0, distance: 100.0 },
-            TraverseLeg { azimuth_degrees: 0.0, distance: 100.0 },
-        ];
+        let legs = [TraverseLeg { azimuth_degrees: 90.0, distance: 100.0 }, TraverseLeg { azimuth_degrees: 0.0, distance: 100.0 }];
         let closure = traverse_closure(start, &legs, Vec2 { x: 100.0, y: 99.0 });
         assert!(closure.is_ok());
         if let Ok(closure) = closure {
@@ -182,9 +154,6 @@ mod tests {
     #[test]
     fn rejects_invalid_distances_and_parallel_lines() {
         assert!(direct(Vec2 { x: 0.0, y: 0.0 }, 90.0, -1.0).is_err());
-        assert!(line_intersection(
-            Vec2 { x: 0.0, y: 0.0 }, Vec2 { x: 1.0, y: 0.0 },
-            Vec2 { x: 0.0, y: 1.0 }, Vec2 { x: 1.0, y: 1.0 },
-        ).is_err());
+        assert!(line_intersection(Vec2 { x: 0.0, y: 0.0 }, Vec2 { x: 1.0, y: 0.0 }, Vec2 { x: 0.0, y: 1.0 }, Vec2 { x: 1.0, y: 1.0 },).is_err());
     }
 }
