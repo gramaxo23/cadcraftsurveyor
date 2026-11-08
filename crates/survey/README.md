@@ -29,7 +29,7 @@ of the upper-left pixel, as specified by the world-file convention.
 
 ## Limitations / next integration work
 
-This is the algorithm and CAD-neutral drawing-adapter foundation, not yet a finished surveying UI. `SurveyDrawing` is intentionally a small boundary type: a later engine/UI adapter must map its points, lines and polylines into the document's native entity model and create the corresponding layers. The current crate is not yet wired into the command engine, CLI, MCP or desktop/web panels. The TIN triangulator
+The surveying algorithms are connected to the CAD engine through `cadcraft_engine::survey`. `import_csv` parses PNEZD, PENZD or XYZ text and creates native CAD point entities; `import_drawing` creates native 3D polylines and lines for parcel, contour and TIN geometry. Survey point numbers and descriptions are attached to point entities as `CADCRAFT_SURVEY` XDATA. The adapter is callable by engine clients, but a dedicated desktop import dialog, file picker, preview, CLI command and MCP workflow are not yet implemented. The TIN triangulator
 uses bounded Bowyer-Watson insertion (5,000 point cap) with normalised XY predicates; duplicate
 XY coordinates are rejected. Its floating-point predicates are not an exact-arithmetic guarantee
 for near-degenerate survey networks. TIN contours are emitted per triangle and can be stitched
@@ -40,3 +40,22 @@ raster image entities in a drawing, and native CAD entity/UI integration remain 
 Validate all terrain and coordinate operations against known survey control data before production use.
 
 Run the crate tests with `cargo test -p cadcraft-survey`.
+
+
+## Engine integration
+
+The engine exposes the CSV-to-drawing path without requiring UI dependencies:
+
+\`\`\`rust
+use cadcraft_engine::{survey, Session};
+use cadcraft_survey::PointFormat;
+
+let mut session = Session::new();
+let csv = "Point,Northing,Easting,Elevation,Description\n101,34,12,5.6,Control\n";
+let imported = survey::import_csv(&mut session, csv, PointFormat::Pnezd, true)?;
+assert_eq!(imported, 1);
+\`\`\`
+
+For generated terrain or parcel geometry, build a \`SurveyDrawing\` using its helpers and pass it to
+\`survey::import_drawing\`. Imported entities are placed in the active editing space on their
+declared survey layers. The adapter validates the complete input before modifying the drawing.
