@@ -36,6 +36,7 @@ pub fn dialog(app: &mut CadApp, ctx: &egui::Context, open: &mut bool) {
     let id = egui::Id::new("cadcraft_survey_csv_import");
     let mut form = ctx.data(|data| data.get_temp::<Form>(id)).unwrap_or_default();
     let mut do_import = false;
+    let mut close_requested = false;
     let has_drawing = app.session.doc().is_ok();
 
     egui::Window::new("Import Survey CSV")
@@ -134,13 +135,16 @@ pub fn dialog(app: &mut CadApp, ctx: &egui::Context, open: &mut bool) {
                     ui.colored_label(ui.visuals().error_fg_color, "Open a drawing before importing.");
                 }
                 if ui.button("Close").clicked() {
-                    *open = false;
+                    close_requested = true;
                 }
             });
             ui.small(format!("Selected format: {}", format_name(form.format)));
         });
 
     ctx.data_mut(|data| data.insert_temp(id, form.clone()));
+    if close_requested {
+        *open = false;
+    }
 
     if do_import {
         match cadcraft_engine::survey::import_csv(&mut app.session, &form.csv, form.format, form.has_header) {
