@@ -161,6 +161,14 @@ mod tests {
     use super::*;
 
     #[test]
+    fn menu_command_opens_the_import_dialog() {
+        let mut app = crate::CadApp::new(cadcraft_engine::Session::new(), crate::Services::default());
+        let result = crate::menus::run_ui_command(&mut app, "ui.survey.import", &serde_json::Value::Null);
+        assert!(result.is_some());
+        assert_eq!(app.ui.dialog.as_deref(), Some("surveyimport"));
+    }
+
+    #[test]
     fn format_labels_cover_all_supported_csv_layouts() {
         assert!(format_name(PointFormat::Pnezd).starts_with("PNEZD"));
         assert!(format_name(PointFormat::PenZd).starts_with("PENZD"));
