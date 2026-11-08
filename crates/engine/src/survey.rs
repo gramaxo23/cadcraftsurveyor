@@ -27,7 +27,7 @@ pub fn import_drawing(session: &mut Session, survey: &SurveyDrawing) -> Result<u
                 start.iter().chain(end.iter()).all(|value| value.is_finite()),
         };
         if !valid {
-            return Err(crate::EngineError::InvalidInput("survey drawing contains invalid geometry".into()));
+            return Err(crate::EngineError::Other("survey drawing contains invalid geometry".into()));
         }
     }
 
