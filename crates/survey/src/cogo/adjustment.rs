@@ -2,7 +2,7 @@
 use crate::{SurveyError, Vec2};
 use serde::{Deserialize, Serialize};
 
-use super::cogo::{TraverseClosure, TraverseLeg, direct, traverse_closure};
+use super::{TraverseClosure, TraverseLeg, direct, traverse_closure};
 
 /// A traverse leg with its computed endpoint and Bowditch-adjusted endpoint.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
