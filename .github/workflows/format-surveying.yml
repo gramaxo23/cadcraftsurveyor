@@ -1,0 +1,41 @@
+name: Format surveying branch
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [feat/surveying-toolkit]
+    paths:
+      - "crates/survey/**/*.rs"
+      - "crates/engine/src/survey.rs"
+      - "crates/ui-egui/src/survey.rs"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: survey-format-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  format:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - name: Format Rust sources
+        run: cargo fmt --all
+      - name: Commit formatting changes
+        run: |
+          if git diff --quiet; then
+            echo "Rust formatting is already clean."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add crates/survey crates/engine/src/survey.rs crates/ui-egui/src/survey.rs
+          git commit -m "style: format surveying implementation"
+          git push
