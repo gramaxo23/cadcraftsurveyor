@@ -14,6 +14,7 @@ through the command engine, CLI, MCP and desktop/web UI.
   extract contour segments at a requested interval.
 - Read six-line world files and map raster pixel-centre coordinates into drawing/map coordinates.
 - Produce a text survey summary with point count and coordinate/elevation ranges.
+- Convert imported points, parcel boundaries and stitched contours into CAD-neutral, layer-tagged drawing primitives (`SurveyDrawing`) while preserving point metadata and contour elevations.
 
 ## Coordinate conventions
 
@@ -28,7 +29,7 @@ of the upper-left pixel, as specified by the world-file convention.
 
 ## Limitations / next integration work
 
-This is the algorithm and data foundation, not yet a finished surveying UI. The TIN triangulator
+This is the algorithm and CAD-neutral drawing-adapter foundation, not yet a finished surveying UI. `SurveyDrawing` is intentionally a small boundary type: a later engine/UI adapter must map its points, lines and polylines into the document's native entity model and create the corresponding layers. The current crate is not yet wired into the command engine, CLI, MCP or desktop/web panels. The TIN triangulator
 uses bounded Bowyer-Watson insertion (5,000 point cap) with normalised XY predicates; duplicate
 XY coordinates are rejected. Its floating-point predicates are not an exact-arithmetic guarantee
 for near-degenerate survey networks. TIN contours are emitted per triangle and can be stitched
