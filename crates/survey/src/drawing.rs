@@ -15,23 +15,9 @@ pub const TIN_LAYER: &str = "SURVEY-TIN";
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum SurveyDrawingEntity {
-    Point {
-        layer: String,
-        position: [f64; 3],
-        point_number: String,
-        description: String,
-    },
-    Polyline {
-        layer: String,
-        vertices: Vec<[f64; 3]>,
-        closed: bool,
-        elevation: f64,
-    },
-    Line {
-        layer: String,
-        start: [f64; 3],
-        end: [f64; 3],
-    },
+    Point { layer: String, position: [f64; 3], point_number: String, description: String },
+    Polyline { layer: String, vertices: Vec<[f64; 3]>, closed: bool, elevation: f64 },
+    Line { layer: String, start: [f64; 3], end: [f64; 3] },
 }
 
 /// A collection of survey-derived geometry ready for conversion to CAD document entities.
@@ -43,20 +29,21 @@ pub struct SurveyDrawing {
 impl SurveyDrawing {
     /// Creates point marker entities while preserving point numbers and descriptions.
     pub fn from_points(points: &[SurveyPoint]) -> Self {
-        let entities = points.iter().map(|point| SurveyDrawingEntity::Point {
-            layer: POINT_LAYER.to_string(),
-            position: [point.x, point.y, point.elevation],
-            point_number: point.number.clone(),
-            description: point.description.clone(),
-        }).collect();
+        let entities = points
+            .iter()
+            .map(|point| SurveyDrawingEntity::Point {
+                layer: POINT_LAYER.to_string(),
+                position: [point.x, point.y, point.elevation],
+                point_number: point.number.clone(),
+                description: point.description.clone(),
+            })
+            .collect();
         Self { entities }
     }
 
     /// Adds a closed parcel boundary. The input vertices are 2D and use the supplied Z.
     pub fn add_parcel(&mut self, vertices: &[Vec2], elevation: f64) {
-        if vertices.len() < 3 || !elevation.is_finite()
-            || vertices.iter().any(|p| !p.x.is_finite() || !p.y.is_finite())
-        {
+        if vertices.len() < 3 || !elevation.is_finite() || vertices.iter().any(|p| !p.x.is_finite() || !p.y.is_finite()) {
             return;
         }
         self.entities.push(SurveyDrawingEntity::Polyline {
@@ -72,14 +59,14 @@ impl SurveyDrawing {
         if !elevation.is_finite() {
             return;
         }
-        self.entities.extend(contours.iter().filter(|line| line.len() >= 2
-            && line.iter().all(|p| p.x.is_finite() && p.y.is_finite()))
-            .map(|line| SurveyDrawingEntity::Polyline {
+        self.entities.extend(contours.iter().filter(|line| line.len() >= 2 && line.iter().all(|p| p.x.is_finite() && p.y.is_finite())).map(|line| {
+            SurveyDrawingEntity::Polyline {
                 layer: CONTOUR_LAYER.to_string(),
                 vertices: line.iter().map(|p| [p.x, p.y, elevation]).collect(),
                 closed: line.first() == line.last(),
                 elevation,
-            }));
+            }
+        }));
     }
 
     /// Adds the unique edges of a TIN as line entities.
@@ -102,11 +89,7 @@ impl SurveyDrawing {
         }
         edges.sort_by(|left, right| compare_point(&left.0, &right.0).then(compare_point(&left.1, &right.1)));
         edges.dedup_by(|left, right| left.0 == right.0 && left.1 == right.1);
-        self.entities.extend(edges.into_iter().map(|edge| SurveyDrawingEntity::Line {
-            layer: TIN_LAYER.to_string(),
-            start: edge.0,
-            end: edge.1,
-        }));
+        self.entities.extend(edges.into_iter().map(|edge| SurveyDrawingEntity::Line { layer: TIN_LAYER.to_string(), start: edge.0, end: edge.1 }));
     }
 }
 
@@ -116,10 +99,7 @@ mod tests {
 
     #[test]
     fn point_import_becomes_layered_drawing_geometry() {
-        let points = [SurveyPoint {
-            number: "101".into(), x: 12.0, y: 34.0, elevation: 5.6,
-            description: "BM".into(),
-        }];
+        let points = [SurveyPoint { number: "101".into(), x: 12.0, y: 34.0, elevation: 5.6, description: "BM".into() }];
         let drawing = SurveyDrawing::from_points(&points);
         assert_eq!(drawing.entities.len(), 1);
         assert!(matches!(drawing.entities.first(),

@@ -5,7 +5,7 @@
 
 use cadcraft_doc::{Common, EntityKind, Line, Point, Polyline3d, RawTag};
 use cadcraft_geom::Vec3;
-use cadcraft_survey::{import_points_csv, PointFormat, SurveyDrawing, SurveyDrawingEntity};
+use cadcraft_survey::{PointFormat, SurveyDrawing, SurveyDrawingEntity, import_points_csv};
 
 use crate::{EngineError, Result, Session};
 
@@ -27,18 +27,19 @@ pub fn import_drawing(session: &mut Session, survey: &SurveyDrawing) -> Result<u
     // partially imported survey or create empty layers.
     for entity in &survey.entities {
         let (layer, valid_geometry) = match entity {
-            SurveyDrawingEntity::Point { layer, position, point_number, .. } =>
-                (layer, !point_number.trim().is_empty() && position.iter().all(|value| value.is_finite())),
-            SurveyDrawingEntity::Polyline { layer, vertices, elevation, .. } =>
-                (layer, vertices.len() >= 2 && elevation.is_finite()
-                    && vertices.iter().flatten().all(|value| value.is_finite())),
-            SurveyDrawingEntity::Line { layer, start, end } =>
-                (layer, start.iter().chain(end.iter()).all(|value| value.is_finite())),
+            SurveyDrawingEntity::Point { layer, position, point_number, .. } => {
+                (layer, !point_number.trim().is_empty() && position.iter().all(|value| value.is_finite()))
+            }
+            SurveyDrawingEntity::Polyline { layer, vertices, elevation, .. } => {
+                (layer, vertices.len() >= 2 && elevation.is_finite() && vertices.iter().flatten().all(|value| value.is_finite()))
+            }
+            SurveyDrawingEntity::Line { layer, start, end } => (layer, start.iter().chain(end.iter()).all(|value| value.is_finite())),
         };
         if !valid_geometry {
             return Err(EngineError::Other("survey drawing contains invalid geometry".into()));
         }
-        if layer.trim().is_empty() || layer.len() > 255
+        if layer.trim().is_empty()
+            || layer.len() > 255
             || layer.chars().any(|ch| ch.is_control() || matches!(ch, '<' | '>' | '/' | '\\' | '"' | ':' | ';' | '?' | '*' | '|' | '=' | ','))
         {
             return Err(EngineError::Other(format!("invalid survey layer name: {layer:?}")));
@@ -57,28 +58,17 @@ pub fn import_drawing(session: &mut Session, survey: &SurveyDrawing) -> Result<u
             ),
             SurveyDrawingEntity::Polyline { layer, vertices, closed, .. } => (
                 layer,
-                EntityKind::Polyline3d(Polyline3d {
-                    points: vertices.iter().map(|p| Vec3::new(p[0], p[1], p[2])).collect(),
-                    closed: *closed,
-                }),
+                EntityKind::Polyline3d(Polyline3d { points: vertices.iter().map(|p| Vec3::new(p[0], p[1], p[2])).collect(), closed: *closed }),
                 None,
             ),
-            SurveyDrawingEntity::Line { layer, start, end } => (
-                layer,
-                EntityKind::Line(Line {
-                    a: Vec3::new(start[0], start[1], start[2]),
-                    b: Vec3::new(end[0], end[1], end[2]),
-                }),
-                None,
-            ),
+            SurveyDrawingEntity::Line { layer, start, end } => {
+                (layer, EntityKind::Line(Line { a: Vec3::new(start[0], start[1], start[2]), b: Vec3::new(end[0], end[1], end[2]) }), None)
+            }
         };
 
         let mut common = Common { layer: layer.clone(), ..base_common.clone() };
         if let Some((number, description)) = point_metadata {
-            common.xdata = vec![
-                RawTag { code: 1001, value: SURVEY_XDATA_APP.into() },
-                RawTag { code: 1000, value: "POINT_NUMBER".into() },
-            ];
+            common.xdata = vec![RawTag { code: 1001, value: SURVEY_XDATA_APP.into() }, RawTag { code: 1000, value: "POINT_NUMBER".into() }];
             append_xdata_text(&mut common.xdata, number);
             common.xdata.push(RawTag { code: 1000, value: "DESCRIPTION".into() });
             append_xdata_text(&mut common.xdata, description);
@@ -94,8 +84,7 @@ pub fn import_drawing(session: &mut Session, survey: &SurveyDrawing) -> Result<u
 /// CSV parsing completes before the drawing is touched. The returned count is the number of
 /// native CAD point entities created.
 pub fn import_csv(session: &mut Session, input: &str, format: PointFormat, has_header: bool) -> Result<usize> {
-    let parsed = import_points_csv(input, format, has_header)
-        .map_err(|error| EngineError::Other(error.to_string()))?;
+    let parsed = import_points_csv(input, format, has_header).map_err(|error| EngineError::Other(error.to_string()))?;
     let drawing = SurveyDrawing::from_points(&parsed.points);
     import_drawing(session, &drawing)
 }
@@ -130,15 +119,8 @@ mod tests {
     #[test]
     fn imports_native_entities_with_point_metadata_and_declared_layers() {
         let mut session = Session::new();
-        let survey = SurveyDrawing::from_points(&[
-            SurveyPoint {
-                number: "101".into(),
-                x: 12.0,
-                y: 34.0,
-                elevation: 5.6,
-                description: "BM / control".into(),
-            },
-        ]);
+        let survey =
+            SurveyDrawing::from_points(&[SurveyPoint { number: "101".into(), x: 12.0, y: 34.0, elevation: 5.6, description: "BM / control".into() }]);
 
         assert_eq!(import_drawing(&mut session, &survey).ok(), Some(1));
         let drawing = session.doc();
@@ -182,11 +164,7 @@ mod tests {
                     closed: true,
                     elevation: 2.0,
                 },
-                SurveyDrawingEntity::Line {
-                    layer: "SURVEY-TIN".into(),
-                    start: [0.0, 0.0, 1.0],
-                    end: [10.0, 10.0, 3.0],
-                },
+                SurveyDrawingEntity::Line { layer: "SURVEY-TIN".into(), start: [0.0, 0.0, 1.0], end: [10.0, 10.0, 3.0] },
             ],
         };
         assert_eq!(import_drawing(&mut session, &survey).ok(), Some(2));
@@ -202,11 +180,7 @@ mod tests {
     fn rejects_invalid_geometry_and_layer_names_before_import() {
         let mut session = Session::new();
         let invalid_geometry = SurveyDrawing {
-            entities: vec![SurveyDrawingEntity::Line {
-                layer: "SURVEY-TIN".into(),
-                start: [0.0, 0.0, 0.0],
-                end: [f64::NAN, 1.0, 0.0],
-            }],
+            entities: vec![SurveyDrawingEntity::Line { layer: "SURVEY-TIN".into(), start: [0.0, 0.0, 0.0], end: [f64::NAN, 1.0, 0.0] }],
         };
         assert!(import_drawing(&mut session, &invalid_geometry).is_err());
         assert!(session.doc().is_ok_and(|drawing| drawing.layer("SURVEY-TIN").is_none()));
