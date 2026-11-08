@@ -27,8 +27,8 @@ pub fn import_drawing(session: &mut Session, survey: &SurveyDrawing) -> Result<u
     // partially imported survey or create empty layers.
     for entity in &survey.entities {
         let (layer, valid_geometry) = match entity {
-            SurveyDrawingEntity::Point { layer, position, .. } =>
-                (layer, position.iter().all(|value| value.is_finite())),
+            SurveyDrawingEntity::Point { layer, position, point_number, .. } =>
+                (layer, !point_number.trim().is_empty() && position.iter().all(|value| value.is_finite())),
             SurveyDrawingEntity::Polyline { layer, vertices, elevation, .. } =>
                 (layer, vertices.len() >= 2 && elevation.is_finite()
                     && vertices.iter().flatten().all(|value| value.is_finite())),
@@ -38,7 +38,7 @@ pub fn import_drawing(session: &mut Session, survey: &SurveyDrawing) -> Result<u
         if !valid_geometry {
             return Err(EngineError::Other("survey drawing contains invalid geometry".into()));
         }
-        if layer.trim().is_empty()
+        if layer.trim().is_empty() || layer.len() > 255
             || layer.chars().any(|ch| ch.is_control() || matches!(ch, '<' | '>' | '/' | '\\' | '"' | ':' | ';' | '?' | '*' | '|' | '=' | ','))
         {
             return Err(EngineError::Other(format!("invalid survey layer name: {layer:?}")));
