@@ -125,7 +125,7 @@ pub const fn xdata_application_name() -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use cadcraft_survey::{PointFormat, SurveyDrawing, SurveyPoint};
+    use cadcraft_survey::{SurveyDrawing, SurveyPoint};
 
     #[test]
     fn imports_native_entities_with_point_metadata_and_declared_layers() {
@@ -154,6 +154,21 @@ mod tests {
             }
             assert!(drawing.layer("SURVEY-POINTS").is_some());
         }
+    }
+
+    #[test]
+    fn csv_import_creates_native_points_and_keeps_number_and_description() {
+        let mut session = Session::new();
+        let csv = "Point,Northing,Easting,Elevation,Description\\n101,34,12,5.6,Control\\n";
+        assert_eq!(import_csv(&mut session, csv, PointFormat::Pnezd, true).ok(), Some(1));
+        assert!(session.doc().is_ok_and(|drawing| {
+            drawing.model.iter().any(|entity| {
+                matches!(&entity.kind, EntityKind::Point(point)
+                    if point.p.x == 12.0 && point.p.y == 34.0 && point.p.z == 5.6)
+                    && entity.common.xdata.iter().any(|tag| tag.value == "101")
+                    && entity.common.xdata.iter().any(|tag| tag.value == "Control")
+            })
+        }));
     }
 
     #[test]
