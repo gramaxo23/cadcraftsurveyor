@@ -107,7 +107,8 @@ impl SurveyDrawing {
             start: edge.0,
             end: edge.1,
         }));
-    }}
+    }
+}
 
 #[cfg(test)]
 mod tests {
