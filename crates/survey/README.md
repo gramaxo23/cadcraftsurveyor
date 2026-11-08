@@ -1,60 +1,113 @@
 # CADCraft Survey
 
-This workspace crate provides the first surveying analysis layer for CADCraft. It is deliberately
-independent of egui and the drawing document so that the algorithms can be tested and later exposed
-through the command engine, CLI, MCP and desktop/web UI.
+`cadcraft-survey` is the surveying and civil-site analysis library in the CADCraft workspace.
+It is intentionally independent of egui and the drawing database so calculation logic can be
+tested separately and reused by desktop, CLI, MCP and other future clients.
 
-## Initial capabilities
+> **Release status:** engineering prototype / supervised evaluation. This crate is not certified
+> for legal cadastral determinations, unsupervised construction set-out or contractual quantity
+> measurement. See [the production-readiness gate](../../docs/surveying-production-readiness.md).
 
-- Import CSV survey points in PNEZD, PENZD and XYZ column order, including quoted descriptions.
-- Validate point identifiers and finite eastings, northings and elevations; cap import size and point count.
-- Fit a 2D affine coordinate transformation from three non-collinear control-point pairs.
-- Compute closed parcel polygon area and perimeter.
-- Represent regular elevation grids, calculate average-cell cut/fill against a design elevation, and
-  extract contour segments at a requested interval.
-- Read six-line world files and map raster pixel-centre coordinates into drawing/map coordinates.
-- Produce a text survey summary with point count and coordinate/elevation ranges.
-- Convert imported points, parcel boundaries and stitched contours into CAD-neutral, layer-tagged drawing primitives (`SurveyDrawing`) while preserving point metadata and contour elevations.
+## Capability reference
 
-## Coordinate conventions
+| Module / area | API and functionality |
+|---|---|
+| Point data | `import_points_csv`, `PointFormat`, `SurveyPoint`, `export_pnezd_csv`, `group_points_by_code` |
+| COGO | `cogo`: direct/inverse calculations, azimuths, infinite-line intersection and traverse closure diagnostics |
+| Traverse adjustment | `cogo::adjustment`: Bowditch/compass-rule adjustment |
+| Units and CRS metadata | `civil::LinearUnit`, `SurveyCrsMetadata`, axis order and coordinate-use metadata, explicit scale-factor helper |
+| Control fit | Existing three-control affine fit plus redundant unweighted 2D similarity fit with residuals, RMS and maximum residual |
+| Parcels | `parcel_area`, `parcel_perimeter` |
+| Terrain | `Tin`: triangulation, elevation queries, contour segments and contour stitching; regular-grid cut/fill |
+| Alignment | `HorizontalAlignment`: stationing, offsets and station equations |
+| Profiles | `VerticalProfile`: linear elevation interpolation and segment grade |
+| Cross sections | `CrossSection`: cut/fill area to a datum; average-end-area volume between sections |
+| Setting-out | `stakeout_deltas`: horizontal distance, whole-circle azimuth and optional elevation difference |
+| CAD-neutral output | `SurveyDrawing` and survey drawing entities for points, parcel geometry, contours and TIN edges |
 
-All coordinates and measurements use the drawing's linear units. In `SurveyPoint`, `x` is
-easting, `y` is northing, and `elevation` is Z. PNEZD import maps the second CSV field to
-northing and the third to easting. The XYZ format has no point-number column; generated point
-numbers begin at 1.
+## Coordinate and measurement conventions
 
-The affine transform is a general six-parameter 2D transform, not a datum transformation or a
-substitute for a validated national grid operation. World-file origin values refer to the centre
-of the upper-left pixel, as specified by the world-file convention.
+- `SurveyPoint.x` is easting, `y` is northing, and `elevation` is Z.
+- PNEZD input order is point number, northing, easting, elevation, description.
+- PENZD input order is point number, easting, northing, elevation, description.
+- XYZ input order is easting, northing, elevation, with generated point numbers.
+- COGO azimuths are whole-circle bearings measured clockwise from grid north.
+- Alignment positive offset is to the right of increasing station.
+- Linear, area and volume conversions distinguish the international foot (0.3048 m) from the US
+  survey foot (1200/3937 m).
+- Coordinates are not automatically transformed. All operands in a calculation must already use
+  compatible coordinate systems and units.
 
-## Limitations / next integration work
+`SurveyCrsMetadata` stores authority/code, datum, projection, geoid model, coordinate epoch,
+horizontal and vertical units, axis order, grid/ground/local use and an optional combined scale
+factor. Validation checks metadata consistency; it does **not** resolve EPSG definitions or perform
+datum, projection, geoid or epoch transformations. A scale-factor helper does not decide the
+grid-to-ground convention for the operator.
 
-The surveying algorithms are connected to the CAD engine through `cadcraft_engine::survey`. `import_csv` parses PNEZD, PENZD or XYZ text and creates native CAD point entities; `import_drawing` creates native 3D polylines and lines for parcel, contour and TIN geometry. Survey point numbers and descriptions are attached to point entities as `CADCRAFT_SURVEY` XDATA. The adapter is callable by engine clients, and the egui front end now exposes **Insert → Survey CSV...** with PNEZD/PENZD/XYZ selection, file-open or paste input, validation preview and import feedback. A dedicated CLI command and MCP workflow are not yet implemented. The TIN triangulator
-uses bounded Bowyer-Watson insertion (5,000 point cap) with normalised XY predicates; duplicate
-XY coordinates are rejected. Its floating-point predicates are not an exact-arithmetic guarantee
-for near-degenerate survey networks. TIN contours are emitted per triangle and can be stitched
-using an endpoint tolerance, but the current stitcher follows forward endpoints only and is not a
-full branch-aware topology solver. Grid volumes use the four-corner average for each complete
-cell; cells with missing corner elevations are skipped. Datum/geoid transformations, georeferenced raster image entities in a drawing, and a dedicated CLI/MCP workflow remain follow-on work.
-Validate all terrain and coordinate operations against known survey control data before production use.
+## Desktop point import
 
-Run the crate tests with `cargo test -p cadcraft-survey`.
+The desktop application exposes **Insert → Survey CSV...**. It supports PNEZD, PENZD and XYZ,
+file selection or pasted data, an optional header, a parsed-point preview and validation feedback.
+The engine adapter `cadcraft_engine::survey::import_csv` creates native CAD point entities.
+`import_drawing` converts a `SurveyDrawing` into native points, 3D polylines and lines. Survey
+point numbers and descriptions are stored on point entities as `CADCRAFT_SURVEY` XDATA.
 
+Example engine integration:
 
-## Engine integration
-
-The engine exposes the CSV-to-drawing path without requiring UI dependencies:
-
-\`\`\`rust
+```rust
 use cadcraft_engine::{survey, Session};
 use cadcraft_survey::PointFormat;
 
-let mut session = Session::new();
-let csv = "Point,Northing,Easting,Elevation,Description\n101,34,12,5.6,Control\n";
-let imported = survey::import_csv(&mut session, csv, PointFormat::Pnezd, true)?;
-assert_eq!(imported, 1);
-\`\`\`
+fn import_control_points() -> Result<usize, Box<dyn std::error::Error>> {
+    let mut session = Session::new();
+    let csv = "Point,Northing,Easting,Elevation,Description\n101,5000,2000,125.5,CONTROL\n";
+    let count = survey::import_csv(&mut session, csv, PointFormat::Pnezd, true)?;
+    Ok(count)
+}
+```
 
-For generated terrain or parcel geometry, build a \`SurveyDrawing\` using its helpers and pass it to
-\`survey::import_drawing\`. Imported entities are placed in the active editing space on their
-declared survey layers. The adapter validates the complete input before modifying the drawing.
+## Calculation examples
+
+```rust
+use cadcraft_survey::civil::LinearUnit;
+
+fn convert_distance() -> Result<f64, cadcraft_survey::SurveyError> {
+    LinearUnit::UsSurveyFoot.convert(100.0, LinearUnit::Metre)
+}
+```
+
+## Known limitations
+
+- TIN construction is bounded to 5,000 points, uses floating-point predicates and rejects duplicate
+  XY coordinates. Breakline constraints, surface boundaries and holes are not implemented.
+- Contour stitching is a simple endpoint walk, not a branch-aware topology solver.
+- Grid cut/fill uses four-corner cell averaging, skips incomplete cells and does not clip to
+  project boundaries. It is not a TIN-to-TIN quantity engine.
+- Similarity fitting is unweighted and 2D; it does not provide covariance, a stochastic observation
+  model, vertical adjustment or robust outlier detection.
+- The affine transformation is a three-control exact fit, not a datum transformation.
+- Raw field observations, field-book reduction, instrument-specific formats and full import
+  provenance/audit reports are not implemented.
+- CRS metadata is not yet persisted and enforced through every project, import, export and report.
+- World-file coordinate mapping is not a complete georeferenced raster workflow.
+- No independent company control datasets or third-party reference calculations have been run.
+
+## Tests and development
+
+Run the focused crate tests:
+
+```sh
+cargo test -p cadcraft-survey
+```
+
+Run formatting and the wider relevant package tests:
+
+```sh
+cargo fmt --all -- --check
+cargo test -p cadcraft-survey -p cadcraft-engine -p cadcraft-ui-egui
+```
+
+Before using results operationally, compare every relevant calculation against independent,
+documented reference data and obtain sign-off from a qualified surveyor. See
+[docs/surveying-production-readiness.md](../../docs/surveying-production-readiness.md) for the
+release checklist.
