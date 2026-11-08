@@ -1,3 +1,6 @@
+pub mod tin;
+pub use tin::{stitch_contours, Tin, TinContourSegment, Triangle};
+
 //! Surveying and civil-site analysis primitives for CADCraft.
 //!
 //! Coordinates are expressed in drawing units. CSV point import uses the common
