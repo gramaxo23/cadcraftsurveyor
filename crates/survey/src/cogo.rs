@@ -1,3 +1,5 @@
+pub mod adjustment;
+
 //! Coordinate geometry (COGO) calculations for surveying workflows.
 //!
 //! Bearings are whole-circle azimuths measured clockwise from grid north, in degrees.
