@@ -5,6 +5,7 @@
 #![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::unimplemented, clippy::todo, clippy::unreachable)]
 #![forbid(unsafe_code)]
 
+pub mod cogo;
 pub mod drawing;
 pub mod tin;
 pub use drawing::{SurveyDrawing, SurveyDrawingEntity};
