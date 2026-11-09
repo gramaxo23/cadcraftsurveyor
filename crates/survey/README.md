@@ -78,6 +78,32 @@ fn convert_distance() -> Result<f64, cadcraft_survey::SurveyError> {
 }
 ```
 
+### Parcel boundary example
+
+```rust
+use cadcraft_survey::{ParcelBoundary, Vec2};
+
+fn parcel_edge_report() -> Result<String, cadcraft_survey::SurveyError> {
+    let mut boundary = ParcelBoundary::new(vec![
+        Vec2 { x: 100.0, y: 200.0 },
+        Vec2 { x: 140.0, y: 200.0 },
+        Vec2 { x: 140.0, y: 230.0 },
+        Vec2 { x: 100.0, y: 230.0 },
+    ])?;
+
+    // Each edit is validated before it replaces the existing ring.
+    boundary.insert_vertex(0, Vec2 { x: 120.0, y: 200.0 })?;
+    let metrics = boundary.metrics();
+    let edge_schedule = boundary.report();
+    let _area = metrics.area;
+    Ok(edge_schedule)
+}
+```
+
+Boundary vertices must already be ordered around the parcel. ParcelBoundary rejects non-finite,
+degenerate, self-intersecting or numerically unstable rings. report() labels measurements in
+drawing units; supply and verify the project's CRS, units and legal area convention separately.
+
 ## Known limitations
 
 - Parcel boundaries are limited to 4,096 vertices, use scale-normalized floating-point topology tests, and reject self-intersections and numerically unstable rings. Area is plan area in drawing units squared; no legal area convention is inferred.
