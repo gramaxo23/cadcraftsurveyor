@@ -33,6 +33,7 @@ pub mod select;
 pub mod settings_dir;
 pub mod snap;
 pub mod spatial;
+pub mod survey;
 pub mod sysvars;
 pub mod undoctl;
 pub mod units;
