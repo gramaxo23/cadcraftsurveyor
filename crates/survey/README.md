@@ -83,7 +83,11 @@ fn convert_distance() -> Result<f64, cadcraft_survey::SurveyError> {
 
 - TIN construction is bounded to 5,000 points, uses floating-point predicates and rejects duplicate
   XY coordinates. Breakline constraints, surface boundaries and holes are not implemented.
-- Contour stitching builds an endpoint graph, reverses segments as needed, preserves closed loops and splits paths at branch nodes. It is still tolerance-based and is not a robust-predicate terrain topology solver.
+- Contour generation caps total candidate triangle-levels at 1,000,000 and rejects intervals below
+  the elevation data's floating-point resolution. Shared horizontal edges are emitted once.
+- Contour stitching caps input at 1,000,000 segments and builds an endpoint graph with separate XY and
+  elevation tolerances. It reverses segments, preserves closed loops and splits paths at branch nodes,
+  but it is not a robust-predicate terrain topology solver.
 - Grid cut/fill uses four-corner cell averaging, skips incomplete cells and does not clip to
   project boundaries. It is not a TIN-to-TIN quantity engine.
 - Similarity fitting is unweighted and 2D; it does not provide covariance, a stochastic observation

@@ -194,9 +194,11 @@ unsupervised construction setting-out, or payment quantities. In particular:
   coordinate-epoch transformations are not implemented or automatically applied.
 - The redundant similarity fit is unweighted and 2D; it is not a least-squares geodetic network
   adjustment and does not provide covariance or statistical outlier tests.
-- The TIN is bounded to 5,000 points, uses floating-point predicates, and does not yet enforce
-  breaklines, surface boundaries or holes.
-- Contour stitching is branch-aware and preserves closed loops, but remains tolerance-based and is not a full robust-predicate terrain topology solver.
+- The TIN is bounded to 5,000 points and uses floating-point predicates; contour generation is
+  capped at 1,000,000 candidate triangle-levels and stitching at 1,000,000 segments. Intervals
+  below the elevation data's floating-point resolution are rejected. Breaklines, boundaries and
+  holes are not enforced.
+- Contour stitching uses separate XY/elevation tolerances, is branch-aware and preserves closed loops, but remains tolerance-based and is not a full robust-predicate terrain topology solver.
 - Grid cut/fill uses complete four-corner cells and does not provide validated TIN-to-TIN
   quantities or project-boundary clipping.
 - Instrument-specific field-book reduction/export, complete survey audit trails and end-to-end
