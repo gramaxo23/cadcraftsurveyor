@@ -135,13 +135,13 @@ validated survey adjustment package or a complete Civil 3D workflow**.
 | Survey point data | Import PNEZD, PENZD and XYZ CSV; validate identifiers and finite coordinates; preview points before desktop import; export PNEZD CSV; group points by the first description code |
 | COGO and traverse | Direct and inverse calculations, whole-circle azimuths, infinite-line intersections, traverse closure diagnostics and Bowditch (compass-rule) adjustment |
 | Coordinate handling | Linear, area and volume unit conversions; separate international-foot and US-survey-foot definitions; CRS metadata validation; 2D affine fit from three controls; redundant unweighted 2D similarity fit with residual, RMS and maximum-residual reporting |
-| Parcels | Polygon area and perimeter calculations |
+| Parcels | Validated parcel boundaries from ordered survey points; stable area/perimeter/centroid; point-in-polygon; edge azimuth/distance schedules; atomic vertex insert/move/remove; closed native 3D parcel polylines |
 | Terrain | Bounded Bowyer–Watson TIN, scale-independent elevation queries, deduplicated contour segments and branch-aware contour polylines; regular elevation grids and grid-based cut/fill |
 | Civil geometry | Horizontal alignment station/offset calculations, station equations, linear vertical-profile interpolation and grade calculations |
 | Cross sections | Section cut/fill area to a datum and average-end-area volume between sections |
 | Construction layout | Instrument-to-design stakeout distance, azimuth and optional elevation differences |
 | CAD integration | Convert survey drawing primitives into native CAD points, 3D polylines and lines; point numbers/descriptions are retained as `CADCRAFT_SURVEY` XDATA |
-| Desktop workflow | `Insert → Survey CSV...` supports PNEZD/PENZD/XYZ, file selection or paste, validation preview, optional TIN edge generation and stitched contour import |
+| Desktop workflow | `Insert → Survey CSV...` supports PNEZD/PENZD/XYZ, file selection or paste, validation preview, optional parcel boundary creation, TIN edge generation and stitched contour import |
 
 ### Importing survey points
 
@@ -199,6 +199,7 @@ unsupervised construction setting-out, or payment quantities. In particular:
   below the elevation data's floating-point resolution are rejected. Breaklines, boundaries and
   holes are not enforced.
 - Contour stitching uses separate XY/elevation tolerances, is branch-aware and preserves closed loops, but remains tolerance-based and is not a full robust-predicate terrain topology solver.
+- Parcel boundary creation validates the ordered ring and rejects non-adjacent edge intersections; the desktop importer does not yet provide interactive grip editing of an already-imported parcel. Area is plan area in drawing units squared, not a jurisdiction-specific legal area determination.
 - Grid cut/fill uses complete four-corner cells and does not provide validated TIN-to-TIN
   quantities or project-boundary clipping.
 - Instrument-specific field-book reduction/export, complete survey audit trails and end-to-end

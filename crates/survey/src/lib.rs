@@ -8,8 +8,10 @@
 pub mod civil;
 pub mod cogo;
 pub mod drawing;
+pub mod parcel;
 pub mod tin;
 pub use drawing::{SurveyDrawing, SurveyDrawingEntity};
+pub use parcel::{MAX_PARCEL_VERTICES, ParcelBoundary, ParcelEdge, ParcelMetrics, PointLocation};
 pub use tin::{MAX_TIN_POINTS, Tin, TinContourPolyline, TinContourSegment, Triangle, stitch_contour_polylines, stitch_contours};
 
 use serde::{Deserialize, Serialize};
@@ -35,6 +37,8 @@ pub enum SurveyError {
     DegenerateControls,
     #[error("grid dimensions or spacing are invalid")]
     InvalidGrid,
+    #[error("invalid parcel boundary: {0}")]
+    InvalidParcel(String),
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -203,36 +207,11 @@ impl Affine2 {
 }
 
 pub fn parcel_area(points: &[Vec2]) -> Result<f64, SurveyError> {
-    if points.len() < 3 {
-        return Err(SurveyError::NotEnoughPoints(3));
-    }
-    let mut sum = 0.0;
-    for i in 0..points.len() {
-        let p = points.get(i).ok_or(SurveyError::NotEnoughPoints(3))?;
-        let q = points.get((i + 1) % points.len()).ok_or(SurveyError::NotEnoughPoints(3))?;
-        if !(p.x.is_finite() && p.y.is_finite() && q.x.is_finite() && q.y.is_finite()) {
-            return Err(SurveyError::InvalidValue("parcel has non-finite coordinates".into()));
-        }
-        sum += p.x * q.y - q.x * p.y;
-    }
-    let area = sum.abs() * 0.5;
-    if area.is_finite() { Ok(area) } else { Err(SurveyError::InvalidValue("parcel area overflowed".into())) }
+    Ok(crate::parcel::ParcelBoundary::new(points.to_vec())?.metrics().area)
 }
 
 pub fn parcel_perimeter(points: &[Vec2]) -> Result<f64, SurveyError> {
-    if points.len() < 3 {
-        return Err(SurveyError::NotEnoughPoints(3));
-    }
-    let mut sum = 0.0;
-    for i in 0..points.len() {
-        let p = points.get(i).ok_or(SurveyError::NotEnoughPoints(3))?;
-        let q = points.get((i + 1) % points.len()).ok_or(SurveyError::NotEnoughPoints(3))?;
-        if !(p.x.is_finite() && p.y.is_finite() && q.x.is_finite() && q.y.is_finite()) {
-            return Err(SurveyError::InvalidValue("parcel has non-finite coordinates".into()));
-        }
-        sum += (q.x - p.x).hypot(q.y - p.y);
-    }
-    if sum.is_finite() { Ok(sum) } else { Err(SurveyError::InvalidValue("parcel perimeter overflowed".into())) }
+    Ok(crate::parcel::ParcelBoundary::new(points.to_vec())?.metrics().perimeter)
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]

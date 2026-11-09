@@ -6,7 +6,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::tin::{Tin, TinContourPolyline};
-use crate::{SurveyPoint, Vec2};
+use crate::{ParcelBoundary, ParcelMetrics, SurveyError, SurveyPoint, Vec2};
 
 /// Conventional layer names used by the survey drawing adapter.
 pub const POINT_LAYER: &str = "SURVEY-POINTS";
@@ -53,6 +53,26 @@ impl SurveyDrawing {
             closed: true,
             elevation,
         });
+    }
+
+    /// Adds a validated parcel boundary from survey points in CSV/field-book order.
+    ///
+    /// XY topology is checked before geometry is added. Vertex elevations are retained in the
+    /// native-ready 3D polyline; no point sorting or legal area convention is inferred.
+    pub fn add_parcel_points(&mut self, points: &[SurveyPoint]) -> Result<ParcelMetrics, SurveyError> {
+        let boundary = ParcelBoundary::from_points(points)?;
+        let mut vertices = Vec::with_capacity(boundary.vertices().len());
+        let mut mean_elevation = 0.0;
+        for (index, position) in boundary.vertices().iter().enumerate() {
+            let point = points.get(index).ok_or(SurveyError::NotEnoughPoints(3))?;
+            let count = (index + 1) as f64;
+            mean_elevation = mean_elevation * ((count - 1.0) / count) + point.elevation / count;
+            vertices.push([position.x, position.y, point.elevation]);
+        }
+        self.entities.push(SurveyDrawingEntity::Polyline {
+            layer: PARCEL_LAYER.to_string(), vertices, closed: true, elevation: mean_elevation,
+        });
+        Ok(boundary.metrics())
     }
 
     /// Adds open contour polylines, retaining their measured contour elevation.
@@ -134,6 +154,37 @@ impl SurveyDrawing {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn ordered_survey_points_create_a_validated_closed_parcel_with_vertex_elevations() {
+        let points = vec![
+            SurveyPoint { number: "1".into(), x: 0.0, y: 0.0, elevation: 10.0, description: "A".into() },
+            SurveyPoint { number: "2".into(), x: 4.0, y: 0.0, elevation: 11.0, description: "B".into() },
+            SurveyPoint { number: "3".into(), x: 4.0, y: 3.0, elevation: 12.0, description: "C".into() },
+            SurveyPoint { number: "4".into(), x: 0.0, y: 3.0, elevation: 13.0, description: "D".into() },
+        ];
+        let mut drawing = SurveyDrawing::default();
+        let metrics = drawing.add_parcel_points(&points);
+        assert_eq!(metrics.map(|value| value.area), Ok(12.0));
+        assert!(matches!(
+            drawing.entities.first(),
+            Some(SurveyDrawingEntity::Polyline { layer, vertices, closed: true, .. })
+                if layer == PARCEL_LAYER && vertices.len() == 4 && vertices.get(2).is_some_and(|p| p[2] == 12.0)
+        ));
+    }
+
+    #[test]
+    fn invalid_parcel_points_do_not_add_drawing_geometry() {
+        let points = vec![
+            SurveyPoint { number: "1".into(), x: 0.0, y: 0.0, elevation: 0.0, description: String::new() },
+            SurveyPoint { number: "2".into(), x: 4.0, y: 3.0, elevation: 0.0, description: String::new() },
+            SurveyPoint { number: "3".into(), x: 0.0, y: 3.0, elevation: 0.0, description: String::new() },
+            SurveyPoint { number: "4".into(), x: 4.0, y: 0.0, elevation: 0.0, description: String::new() },
+        ];
+        let mut drawing = SurveyDrawing::default();
+        assert!(drawing.add_parcel_points(&points).is_err());
+        assert!(drawing.entities.is_empty());
+    }
 
     #[test]
     fn point_import_becomes_layered_drawing_geometry() {

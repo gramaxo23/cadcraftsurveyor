@@ -17,7 +17,7 @@ tested separately and reused by desktop, CLI, MCP and other future clients.
 | Traverse adjustment | `cogo::adjustment`: Bowditch/compass-rule adjustment |
 | Units and CRS metadata | `civil::LinearUnit`, `SurveyCrsMetadata`, axis order and coordinate-use metadata, explicit scale-factor helper |
 | Control fit | Existing three-control affine fit plus redundant unweighted 2D similarity fit with residuals, RMS and maximum residual |
-| Parcels | `parcel_area`, `parcel_perimeter` |
+| Parcels | `ParcelBoundary`, stable area/perimeter/centroid metrics, point-in-polygon classification, edge bearings/distances, atomic vertex insert/move/remove, text edge schedule report; `parcel_area`, `parcel_perimeter` |
 | Terrain | `Tin`: bounded triangulation, scale-independent elevation queries, deduplicated contour segments, branch-aware contour polylines and regular-grid cut/fill |
 | Alignment | `HorizontalAlignment`: stationing, offsets and station equations |
 | Profiles | `VerticalProfile`: linear elevation interpolation and segment grade |
@@ -48,8 +48,7 @@ grid-to-ground convention for the operator.
 
 The desktop application exposes **Insert → Survey CSV...**. It supports PNEZD, PENZD and XYZ,
 file selection or pasted data, an optional header, a parsed-point preview and validation feedback.
-The dialog can optionally generate a TIN edge network and stitched contour polylines from the same
-validated point set. These are imported as native CAD lines and 3D polylines on dedicated survey
+The dialog can optionally generate a TIN edge network, stitched contour polylines and a closed parcel boundary from the same validated point set. Parcel mode treats CSV row order as boundary order and previews area/perimeter before import. These are imported as native CAD lines and 3D polylines on dedicated survey
 layers. The engine adapter `cadcraft_engine::survey::import_csv` remains available for point-only
 imports; `import_drawing` converts a complete `SurveyDrawing` into native points, 3D polylines
 and lines. Survey point numbers and descriptions are stored on point entities as
@@ -81,6 +80,7 @@ fn convert_distance() -> Result<f64, cadcraft_survey::SurveyError> {
 
 ## Known limitations
 
+- Parcel boundaries are limited to 4,096 vertices, use scale-normalized floating-point topology tests, and reject self-intersections and numerically unstable rings. Area is plan area in drawing units squared; no legal area convention is inferred.
 - TIN construction is bounded to 5,000 points, uses floating-point predicates and rejects duplicate
   XY coordinates. Breakline constraints, surface boundaries and holes are not implemented.
 - Contour generation caps total candidate triangle-levels at 1,000,000 and rejects intervals below
@@ -94,7 +94,7 @@ fn convert_distance() -> Result<f64, cadcraft_survey::SurveyError> {
   model, vertical adjustment or robust outlier detection.
 - The affine transformation is a three-control exact fit, not a datum transformation.
 - Raw field observations, field-book reduction, instrument-specific formats and full import
-  provenance/audit reports are not implemented.
+  provenance/audit reports are not implemented. Parcel reports are plain text and do not yet carry persisted CRS/unit provenance or statutory boundary metadata.
 - CRS metadata is not yet persisted and enforced through every project, import, export and report.
 - World-file coordinate mapping is not a complete georeferenced raster workflow.
 - No independent company control datasets or third-party reference calculations have been run.

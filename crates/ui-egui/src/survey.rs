@@ -1,7 +1,7 @@
 //! CSV survey import dialog: paste or open point data, preview it, then add CAD entities.
 
 use cadcraft_survey::{
-    MAX_TIN_POINTS, PointFormat, SurveyDrawing, SurveyDrawingEntity, SurveyError, SurveyPoint, Tin, import_points_csv, stitch_contour_polylines,
+    MAX_TIN_POINTS, ParcelBoundary, PointFormat, SurveyDrawing, SurveyDrawingEntity, SurveyError, SurveyPoint, Tin, import_points_csv, stitch_contour_polylines,
 };
 
 use crate::CadApp;
@@ -13,6 +13,7 @@ struct Form {
     has_header: bool,
     create_tin: bool,
     create_contours: bool,
+    create_parcel: bool,
     contour_interval: f64,
     file_error: Option<String>,
 }
@@ -25,6 +26,7 @@ impl Default for Form {
             has_header: true,
             create_tin: false,
             create_contours: false,
+            create_parcel: false,
             contour_interval: 1.0,
             file_error: None,
         }
@@ -49,6 +51,9 @@ fn contour_tolerances(points: &[SurveyPoint]) -> (f64, f64) {
 fn build_survey_drawing(form: &Form) -> Result<SurveyDrawing, SurveyError> {
     let parsed = import_points_csv(&form.csv, form.format, form.has_header)?;
     let mut drawing = SurveyDrawing::from_points(&parsed.points);
+    if form.create_parcel {
+        let _ = drawing.add_parcel_points(&parsed.points)?;
+    }
     if form.create_tin || form.create_contours {
         let tin = Tin::from_points(&parsed.points)?;
         if form.create_tin {
@@ -126,6 +131,10 @@ pub fn dialog(app: &mut CadApp, ctx: &egui::Context, open: &mut bool) {
                 ui.add(egui::DragValue::new(&mut form.contour_interval).speed(0.1));
             });
         }
+        ui.checkbox(&mut form.create_parcel, "Create a closed parcel boundary from CSV row order");
+        if form.create_parcel {
+            ui.small("Use boundary vertices only, already ordered around the parcel. CADCraft does not sort points or infer a legal area convention.");
+        }
 
         let preview = import_points_csv(&form.csv, form.format, form.has_header);
         let mut valid = false;
@@ -143,6 +152,18 @@ pub fn dialog(app: &mut CadApp, ctx: &egui::Context, open: &mut bool) {
                     if form.create_contours && (!form.contour_interval.is_finite() || form.contour_interval <= 0.0) {
                         valid = false;
                         ui.colored_label(ui.visuals().error_fg_color, "Contour interval must be a positive finite number.");
+                    }
+                }
+                if form.create_parcel {
+                    match ParcelBoundary::from_points(&result.points) {
+                        Ok(boundary) => {
+                            let metrics = boundary.metrics();
+                            ui.label(format!("Parcel preview: {:.3} drawing units² area · {:.3} drawing units perimeter", metrics.area, metrics.perimeter));
+                        }
+                        Err(error) => {
+                            valid = false;
+                            ui.colored_label(ui.visuals().error_fg_color, format!("Parcel boundary is invalid: {error}"));
+                        }
                     }
                 }
                 ui.separator();
@@ -200,10 +221,10 @@ pub fn dialog(app: &mut CadApp, ctx: &egui::Context, open: &mut bool) {
         match build_survey_drawing(&form) {
             Ok(drawing) => {
                 let point_count = drawing.entities.iter().filter(|entity| matches!(entity, SurveyDrawingEntity::Point { .. })).count();
-                let terrain_count = drawing.entities.len().saturating_sub(point_count);
+                let derived_count = drawing.entities.len().saturating_sub(point_count);
                 match cadcraft_engine::survey::import_drawing(&mut app.session, &drawing) {
                     Ok(count) => {
-                        app.session.echo(format!("Imported {point_count} survey points and {terrain_count} terrain entities ({count} total)."));
+                        app.session.echo(format!("Imported {point_count} survey points and {derived_count} parcel/terrain entities ({count} total)."));
                         *open = false;
                         ctx.data_mut(|data| data.remove::<Form>(id));
                     }
@@ -235,6 +256,7 @@ mod tests {
             has_header: false,
             create_tin: true,
             create_contours: true,
+            create_parcel: false,
             contour_interval: 5.0,
             file_error: None,
         };
@@ -251,7 +273,36 @@ mod tests {
     }
 
     #[test]
-    fn format_labels_cover_all_supported_csv_layouts() {
+    fn parcel_option_previews_and_builds_a_native_closed_boundary() {
+        let form = Form {
+            csv: "1,0,0,10\n2,4,0,11\n3,4,3,12\n4,0,3,13".into(),
+            format: PointFormat::Xyz, has_header: false,
+            create_tin: false, create_contours: false, create_parcel: true,
+            contour_interval: 1.0, file_error: None,
+        };
+        let drawing = build_survey_drawing(&form);
+        assert!(drawing.is_ok());
+        if let Ok(drawing) = drawing {
+            assert!(drawing.entities.iter().any(|entity| matches!(
+                entity,
+                SurveyDrawingEntity::Polyline { layer, vertices, closed: true, .. }
+                    if layer == "SURVEY-PARCELS" && vertices.len() == 4 && vertices.get(3).is_some_and(|p| p[2] == 13.0)
+            )));
+        }
+    }
+
+    #[test]
+    fn parcel_option_rejects_crossing_point_order_before_import() {
+        let form = Form {
+            csv: "1,0,0,0\n2,4,3,0\n3,0,3,0\n4,4,0,0".into(),
+            format: PointFormat::Xyz, has_header: false,
+            create_tin: false, create_contours: false, create_parcel: true,
+            contour_interval: 1.0, file_error: None,
+        };
+        assert!(build_survey_drawing(&form).is_err());
+    }
+
+ {
         assert!(format_name(PointFormat::Pnezd).starts_with("PNEZD"));
         assert!(format_name(PointFormat::PenZd).starts_with("PENZD"));
         assert!(format_name(PointFormat::Xyz).starts_with("XYZ"));
