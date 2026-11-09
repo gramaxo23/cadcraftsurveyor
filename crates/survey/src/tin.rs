@@ -751,7 +751,6 @@ mod tests {
         }));
     }
 
-
     #[test]
     fn contour_generation_keeps_decimal_minimum_edges() {
         let minimum = 0.1 + 0.2;
