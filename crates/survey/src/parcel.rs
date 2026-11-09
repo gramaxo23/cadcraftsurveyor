@@ -420,12 +420,7 @@ mod tests {
     }
     #[test]
     fn accepts_clockwise_winding_and_rejects_adjacent_edge_backtracking() {
-        let clockwise = ParcelBoundary::new(vec![
-            Vec2 { x: 0.0, y: 0.0 },
-            Vec2 { x: 0.0, y: 3.0 },
-            Vec2 { x: 4.0, y: 3.0 },
-            Vec2 { x: 4.0, y: 0.0 },
-        ]);
+        let clockwise = ParcelBoundary::new(vec![Vec2 { x: 0.0, y: 0.0 }, Vec2 { x: 0.0, y: 3.0 }, Vec2 { x: 4.0, y: 3.0 }, Vec2 { x: 4.0, y: 0.0 }]);
         assert!(clockwise.is_ok());
         if let Ok(boundary) = clockwise {
             assert!(boundary.metrics().signed_area < 0.0);
