@@ -34,11 +34,7 @@ impl LinearUnit {
             return Err(SurveyError::InvalidValue("unit conversion input must be finite".into()));
         }
         let converted = value * self.metres_per_unit() / to.metres_per_unit();
-        if converted.is_finite() {
-            Ok(converted)
-        } else {
-            Err(SurveyError::InvalidValue("unit conversion overflowed".into()))
-        }
+        if converted.is_finite() { Ok(converted) } else { Err(SurveyError::InvalidValue("unit conversion overflowed".into())) }
     }
 
     pub fn convert_area(self, value: f64, to: Self) -> Result<f64, SurveyError> {
@@ -99,9 +95,7 @@ impl SurveyCrsMetadata {
         if self.name.trim().is_empty() {
             return Err(SurveyError::InvalidValue("CRS name is required".into()));
         }
-        if self.authority.as_ref().is_some_and(|v| v.trim().is_empty())
-            || self.code.as_ref().is_some_and(|v| v.trim().is_empty())
-        {
+        if self.authority.as_ref().is_some_and(|v| v.trim().is_empty()) || self.code.as_ref().is_some_and(|v| v.trim().is_empty()) {
             return Err(SurveyError::InvalidValue("CRS authority and code cannot be blank".into()));
         }
         if self.coordinate_epoch.is_some_and(|v| !v.is_finite() || v <= 0.0) {
@@ -156,9 +150,7 @@ impl HorizontalAlignment {
         }
         let mut last = f64::NEG_INFINITY;
         for eq in &self.station_equations {
-            if !eq.back_station.is_finite() || !eq.ahead_station.is_finite()
-                || eq.back_station <= last || eq.ahead_station < 0.0
-            {
+            if !eq.back_station.is_finite() || !eq.ahead_station.is_finite() || eq.back_station <= last || eq.ahead_station < 0.0 {
                 return Err(SurveyError::InvalidValue("station equations must be finite and ordered".into()));
             }
             last = eq.back_station;
@@ -168,7 +160,7 @@ impl HorizontalAlignment {
 
     pub fn length(&self) -> Result<f64, SurveyError> {
         self.validate()?;
-        let total: f64 = self.points.windows(2).map(|p| (p[1].x-p[0].x).hypot(p[1].y-p[0].y)).sum();
+        let total: f64 = self.points.windows(2).map(|p| (p[1].x - p[0].x).hypot(p[1].y - p[0].y)).sum();
         if total.is_finite() { Ok(total) } else { Err(SurveyError::InvalidValue("alignment length overflowed".into())) }
     }
 
@@ -311,21 +303,26 @@ impl CrossSection {
             let width = pair[1].offset - pair[0].offset;
             let a = pair[0].elevation - datum;
             let b = pair[1].elevation - datum;
-            if a >= 0.0 && b >= 0.0 { cut += (a + b) * 0.5 * width; }
-            else if a <= 0.0 && b <= 0.0 { fill += (-a - b) * 0.5 * width; }
-            else {
+            if a >= 0.0 && b >= 0.0 {
+                cut += (a + b) * 0.5 * width;
+            } else if a <= 0.0 && b <= 0.0 {
+                fill += (-a - b) * 0.5 * width;
+            } else {
                 let fraction = a.abs() / (a.abs() + b.abs());
                 let left = width * fraction;
                 let right = width - left;
-                if a > 0.0 { cut += a * left * 0.5; fill += -b * right * 0.5; }
-                else { fill += -a * left * 0.5; cut += b * right * 0.5; }
+                if a > 0.0 {
+                    cut += a * left * 0.5;
+                    fill += -b * right * 0.5;
+                } else {
+                    fill += -a * left * 0.5;
+                    cut += b * right * 0.5;
+                }
             }
         }
         if cut.is_finite() && fill.is_finite() { Ok((cut, fill)) } else { Err(SurveyError::InvalidValue("cross-section area overflowed".into())) }
     }
 }
-
-
 
 /// A stakeout target with optional design elevation and a stable point identifier.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -355,8 +352,11 @@ pub fn stakeout_deltas(instrument: Vec2, instrument_elevation: Option<f64>, targ
     }
     let mut result = Vec::with_capacity(targets.len());
     for target in targets {
-        if target.point_number.trim().is_empty() || !target.coordinate.x.is_finite() || !target.coordinate.y.is_finite()
-            || target.elevation.is_some_and(|z| !z.is_finite()) {
+        if target.point_number.trim().is_empty()
+            || !target.coordinate.x.is_finite()
+            || !target.coordinate.y.is_finite()
+            || target.elevation.is_some_and(|z| !z.is_finite())
+        {
             return Err(SurveyError::InvalidValue("stakeout target has invalid identifier or coordinate".into()));
         }
         let dx = target.coordinate.x - instrument.x;
@@ -377,16 +377,18 @@ pub fn stakeout_deltas(instrument: Vec2, instrument_elevation: Option<f64>, targ
 
 /// Creates a CSV export in PNEZD order with RFC-4180-style quote escaping.
 pub fn export_pnezd_csv(points: &[crate::SurveyPoint]) -> Result<String, SurveyError> {
-    if points.is_empty() { return Err(SurveyError::EmptyInput); }
+    if points.is_empty() {
+        return Err(SurveyError::EmptyInput);
+    }
     let mut output = String::from("Point,Northing,Easting,Elevation,Description\r\n");
     for point in points {
         point.validate()?;
         let escaped_number = point.number.replace('"', "\"\"");
         let escaped_description = point.description.replace('"', "\"\"");
-        let _ = std::fmt::Write::write_fmt(&mut output, format_args!(
-            "\"{}\",{:.4},{:.4},{:.4},\"{}\"\r\n",
-            escaped_number, point.y, point.x, point.elevation, escaped_description
-        ));
+        let _ = std::fmt::Write::write_fmt(
+            &mut output,
+            format_args!("\"{}\",{:.4},{:.4},{:.4},\"{}\"\r\n", escaped_number, point.y, point.x, point.elevation, escaped_description),
+        );
     }
     Ok(output)
 }
@@ -411,9 +413,12 @@ mod survey_workflow_tests {
 
     #[test]
     fn stakeout_calculates_bearing_distance_and_height() {
-        let target = StakeoutTarget { point_number: "101".into(), coordinate: Vec2 { x: 3.0, y: 4.0 }, elevation: Some(12.0), description: "corner".into() };
+        let target =
+            StakeoutTarget { point_number: "101".into(), coordinate: Vec2 { x: 3.0, y: 4.0 }, elevation: Some(12.0), description: "corner".into() };
         let result = stakeout_deltas(Vec2 { x: 0.0, y: 0.0 }, Some(10.0), &[target]);
-        assert!(result.is_ok_and(|v| (v[0].horizontal_distance - 5.0).abs() < 1e-9 && (v[0].azimuth_degrees - 36.8698976458).abs() < 1e-8 && v[0].elevation_difference == Some(2.0)));
+        assert!(result.is_ok_and(|v| (v[0].horizontal_distance - 5.0).abs() < 1e-9
+            && (v[0].azimuth_degrees - 36.8698976458).abs() < 1e-8
+            && v[0].elevation_difference == Some(2.0)));
     }
 
     #[test]
@@ -483,10 +488,14 @@ pub fn fit_similarity(source: &[Vec2], target: &[Vec2]) -> Result<SimilarityFit,
     if !scale.is_finite() || scale <= 0.0 || !translation.x.is_finite() || !translation.y.is_finite() {
         return Err(SurveyError::DegenerateControls);
     }
-    let residuals: Vec<Vec2> = source.iter().zip(target.iter()).map(|(s, t)| {
-        let predicted = Vec2 { x: scale * (cos * s.x - sin * s.y) + translation.x, y: scale * (sin * s.x + cos * s.y) + translation.y };
-        Vec2 { x: t.x - predicted.x, y: t.y - predicted.y }
-    }).collect();
+    let residuals: Vec<Vec2> = source
+        .iter()
+        .zip(target.iter())
+        .map(|(s, t)| {
+            let predicted = Vec2 { x: scale * (cos * s.x - sin * s.y) + translation.x, y: scale * (sin * s.x + cos * s.y) + translation.y };
+            Vec2 { x: t.x - predicted.x, y: t.y - predicted.y }
+        })
+        .collect();
     let sum_sq = residuals.iter().map(|r| r.x * r.x + r.y * r.y).sum::<f64>();
     let maximum_residual = residuals.iter().map(|r| r.x.hypot(r.y)).fold(0.0, f64::max);
     let rms = (sum_sq / n).sqrt();
@@ -535,7 +544,10 @@ mod additional_civil_tests {
 
     #[test]
     fn average_end_area_volume_uses_station_spacing() {
-        let section = |station| CrossSection { station, points: vec![SectionOffsetElevation { offset: -1.0, elevation: 12.0 }, SectionOffsetElevation { offset: 1.0, elevation: 12.0 }] };
+        let section = |station| CrossSection {
+            station,
+            points: vec![SectionOffsetElevation { offset: -1.0, elevation: 12.0 }, SectionOffsetElevation { offset: 1.0, elevation: 12.0 }],
+        };
         assert_eq!(average_end_area_volume(&section(0.0), &section(10.0), 10.0), Ok((40.0, 0.0)));
     }
 
@@ -560,17 +572,30 @@ mod tests {
     #[test]
     fn validates_crs_metadata_and_grid_ground_declaration() {
         let metadata = SurveyCrsMetadata {
-            authority: Some("EPSG".into()), code: Some("26910".into()), name: "NAD83 / UTM zone 10N".into(),
-            datum: Some("NAD83".into()), projection: Some("Transverse Mercator".into()), geoid_model: None,
-            coordinate_epoch: None, horizontal_unit: LinearUnit::Metre, vertical_unit: LinearUnit::Metre,
-            axis_order: AxisOrder::EastingNorthing, coordinate_use: CoordinateUse::Grid, combined_scale_factor: Some(0.9996),
+            authority: Some("EPSG".into()),
+            code: Some("26910".into()),
+            name: "NAD83 / UTM zone 10N".into(),
+            datum: Some("NAD83".into()),
+            projection: Some("Transverse Mercator".into()),
+            geoid_model: None,
+            coordinate_epoch: None,
+            horizontal_unit: LinearUnit::Metre,
+            vertical_unit: LinearUnit::Metre,
+            axis_order: AxisOrder::EastingNorthing,
+            coordinate_use: CoordinateUse::Grid,
+            combined_scale_factor: Some(0.9996),
         };
         assert!(metadata.validate().is_ok());
     }
 
     #[test]
     fn alignment_interpolates_and_offsets_to_right() {
-        let alignment = HorizontalAlignment { name: "CL".into(), points: vec![Vec2 { x: 0.0, y: 0.0 }, Vec2 { x: 100.0, y: 0.0 }], start_station: 1000.0, station_equations: Vec::new() };
+        let alignment = HorizontalAlignment {
+            name: "CL".into(),
+            points: vec![Vec2 { x: 0.0, y: 0.0 }, Vec2 { x: 100.0, y: 0.0 }],
+            start_station: 1000.0,
+            station_equations: Vec::new(),
+        };
         let result = alignment.point_at_station(1050.0, 2.0);
         assert!(result.is_ok());
         assert!(result.is_ok_and(|p| (p.coordinate.x - 50.0).abs() < 1e-9 && (p.coordinate.y + 2.0).abs() < 1e-9));
@@ -578,14 +603,20 @@ mod tests {
 
     #[test]
     fn profile_interpolates_and_computes_grade() {
-        let profile = VerticalProfile { name: "FG".into(), points: vec![ProfilePoint { station: 0.0, elevation: 10.0 }, ProfilePoint { station: 100.0, elevation: 15.0 }] };
+        let profile = VerticalProfile {
+            name: "FG".into(),
+            points: vec![ProfilePoint { station: 0.0, elevation: 10.0 }, ProfilePoint { station: 100.0, elevation: 15.0 }],
+        };
         assert_eq!(profile.elevation_at(50.0), Ok(12.5));
         assert_eq!(profile.grade_percent(0), Ok(5.0));
     }
 
     #[test]
     fn cross_section_integrates_cut_and_fill() {
-        let section = CrossSection { station: 0.0, points: vec![SectionOffsetElevation { offset: -5.0, elevation: 12.0 }, SectionOffsetElevation { offset: 5.0, elevation: 8.0 }] };
+        let section = CrossSection {
+            station: 0.0,
+            points: vec![SectionOffsetElevation { offset: -5.0, elevation: 12.0 }, SectionOffsetElevation { offset: 5.0, elevation: 8.0 }],
+        };
         let areas = section.area_to_datum(10.0);
         assert!(areas.is_ok());
         assert!(areas.is_ok_and(|(cut, fill)| (cut - 2.5).abs() < 1e-9 && (fill - 2.5).abs() < 1e-9));

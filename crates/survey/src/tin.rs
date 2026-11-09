@@ -71,7 +71,6 @@ fn normalise(points: &[SurveyPoint]) -> Result<Vec<Vec2>, SurveyError> {
     Ok(points.iter().map(|p| Vec2 { x: (p.x - min_x) / span, y: (p.y - min_y) / span }).collect())
 }
 
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 enum ContourPointKey {
     Vertex(usize),
@@ -115,16 +114,10 @@ fn contour_intersection(
     let first = vertices.get(first_index).ok_or(SurveyError::DegenerateControls)?;
     let second = vertices.get(second_index).ok_or(SurveyError::DegenerateControls)?;
     if elevation_side(first.elevation, level, level_tolerance) == 0 {
-        return Ok(ContourIntersection {
-            key: ContourPointKey::Vertex(first_index),
-            position: Vec2 { x: first.x, y: first.y },
-        });
+        return Ok(ContourIntersection { key: ContourPointKey::Vertex(first_index), position: Vec2 { x: first.x, y: first.y } });
     }
     if elevation_side(second.elevation, level, level_tolerance) == 0 {
-        return Ok(ContourIntersection {
-            key: ContourPointKey::Vertex(second_index),
-            position: Vec2 { x: second.x, y: second.y },
-        });
+        return Ok(ContourIntersection { key: ContourPointKey::Vertex(second_index), position: Vec2 { x: second.x, y: second.y } });
     }
 
     let (low_index, high_index) = if first_index <= second_index { (first_index, second_index) } else { (second_index, first_index) };
@@ -142,10 +135,7 @@ fn contour_intersection(
     if !t.is_finite() {
         return Err(SurveyError::InvalidValue("contour edge interpolation overflowed".into()));
     }
-    let position = Vec2 {
-        x: low.x * (1.0 - t) + high.x * t,
-        y: low.y * (1.0 - t) + high.y * t,
-    };
+    let position = Vec2 { x: low.x * (1.0 - t) + high.x * t, y: low.y * (1.0 - t) + high.y * t };
     if !position.x.is_finite() || !position.y.is_finite() {
         return Err(SurveyError::InvalidValue("contour coordinate interpolation overflowed".into()));
     }
@@ -259,14 +249,8 @@ fn append_triangle_contour(
         push_contour_segment(
             level_index,
             level,
-            ContourIntersection {
-                key: ContourPointKey::Vertex(first_vertex),
-                position: Vec2 { x: first_point.x, y: first_point.y },
-            },
-            ContourIntersection {
-                key: ContourPointKey::Vertex(second_vertex),
-                position: Vec2 { x: second_point.x, y: second_point.y },
-            },
+            ContourIntersection { key: ContourPointKey::Vertex(first_vertex), position: Vec2 { x: first_point.x, y: first_point.y } },
+            ContourIntersection { key: ContourPointKey::Vertex(second_vertex), position: Vec2 { x: second_point.x, y: second_point.y } },
             seen,
             output,
         );
@@ -466,7 +450,6 @@ impl Tin {
         }
         Ok(output)
     }
-
 }
 
 /// A graph-based contour stitcher that preserves branches and closed loops.
@@ -657,12 +640,7 @@ fn quantize_coordinate(value: f64, origin: f64, tolerance: f64) -> Result<i64, S
     Ok(scaled.floor() as i64)
 }
 
-fn trace_contour(
-    start_node: usize,
-    first_edge: usize,
-    graph: &ContourGraph,
-    visited: &mut [bool],
-) -> Result<TinContourPolyline, SurveyError> {
+fn trace_contour(start_node: usize, first_edge: usize, graph: &ContourGraph, visited: &mut [bool]) -> Result<TinContourPolyline, SurveyError> {
     let mut path = vec![start_node];
     let mut current_node = start_node;
     let mut current_edge = first_edge;
@@ -706,21 +684,12 @@ mod tests {
     }
 
     fn segment(start: [f64; 2], end: [f64; 2], elevation: f64) -> TinContourSegment {
-        TinContourSegment {
-            elevation,
-            start: Vec2 { x: start[0], y: start[1] },
-            end: Vec2 { x: end[0], y: end[1] },
-        }
+        TinContourSegment { elevation, start: Vec2 { x: start[0], y: start[1] }, end: Vec2 { x: end[0], y: end[1] } }
     }
 
     #[test]
     fn triangulates_and_interpolates() {
-        let points = [
-            p("1", 0.0, 0.0, 0.0),
-            p("2", 10.0, 0.0, 10.0),
-            p("3", 0.0, 10.0, 20.0),
-            p("4", 10.0, 10.0, 30.0),
-        ];
+        let points = [p("1", 0.0, 0.0, 0.0), p("2", 10.0, 0.0, 10.0), p("3", 0.0, 10.0, 20.0), p("4", 10.0, 10.0, 30.0)];
         let model = Tin::from_points(&points).unwrap_or_else(|_| Tin { vertices: Vec::new(), triangles: Vec::new() });
         let z = model.elevation_at(Vec2 { x: 2.0, y: 2.0 });
         assert!(z.ok().flatten().is_some_and(|value| (value - 8.0).abs() < 1.0e-8));
@@ -728,20 +697,12 @@ mod tests {
 
     #[test]
     fn interpolation_is_scale_independent_for_small_and_large_coordinates() {
-        let small = [
-            p("1", 0.0, 0.0, 0.0),
-            p("2", 1.0e-8, 0.0, 10.0),
-            p("3", 0.0, 1.0e-8, 20.0),
-        ];
+        let small = [p("1", 0.0, 0.0, 0.0), p("2", 1.0e-8, 0.0, 10.0), p("3", 0.0, 1.0e-8, 20.0)];
         let small_tin = Tin::from_points(&small).unwrap_or_else(|_| Tin { vertices: Vec::new(), triangles: Vec::new() });
         let small_z = small_tin.elevation_at(Vec2 { x: 2.0e-9, y: 3.0e-9 });
         assert!(small_z.ok().flatten().is_some_and(|value| (value - 8.0).abs() < 1.0e-8));
 
-        let large = [
-            p("1", 1.0e9, 1.0e9, 0.0),
-            p("2", 1.0e9 + 10.0, 1.0e9, 10.0),
-            p("3", 1.0e9, 1.0e9 + 10.0, 20.0),
-        ];
+        let large = [p("1", 1.0e9, 1.0e9, 0.0), p("2", 1.0e9 + 10.0, 1.0e9, 10.0), p("3", 1.0e9, 1.0e9 + 10.0, 20.0)];
         let large_tin = Tin::from_points(&large).unwrap_or_else(|_| Tin { vertices: Vec::new(), triangles: Vec::new() });
         let large_z = large_tin.elevation_at(Vec2 { x: 1.0e9 + 2.0, y: 1.0e9 + 3.0 });
         assert!(large_z.ok().flatten().is_some_and(|value| (value - 8.0).abs() < 1.0e-8));
@@ -756,12 +717,7 @@ mod tests {
     #[test]
     fn contour_generation_deduplicates_a_shared_horizontal_edge() {
         let tin = Tin {
-            vertices: vec![
-                p("1", 0.0, 0.0, 5.0),
-                p("2", 1.0, 0.0, 10.0),
-                p("3", 1.0, 1.0, 5.0),
-                p("4", 0.0, 1.0, 0.0),
-            ],
+            vertices: vec![p("1", 0.0, 0.0, 5.0), p("2", 1.0, 0.0, 10.0), p("3", 1.0, 1.0, 5.0), p("4", 0.0, 1.0, 0.0)],
             triangles: vec![Triangle { vertices: [0, 1, 2] }, Triangle { vertices: [0, 2, 3] }],
         };
         let contours = tin.contour_segments(5.0);
@@ -786,8 +742,7 @@ mod tests {
         assert!(contours.is_ok());
         assert!(contours.ok().is_some_and(|segments| {
             segments.iter().any(|item| {
-                (item.elevation - 0.3).abs() < 1.0e-12
-                    && ((item.start.x == 0.0 && item.start.y == 0.0) || (item.end.x == 0.0 && item.end.y == 0.0))
+                (item.elevation - 0.3).abs() < 1.0e-12 && ((item.start.x == 0.0 && item.start.y == 0.0) || (item.end.x == 0.0 && item.end.y == 0.0))
             })
         }));
     }
@@ -816,11 +771,7 @@ mod tests {
 
     #[test]
     fn branches_are_split_into_distinct_components() {
-        let segments = [
-            segment([0.0, 0.0], [1.0, 0.0], 5.0),
-            segment([0.0, 0.0], [-1.0, 0.0], 5.0),
-            segment([0.0, 0.0], [0.0, 1.0], 5.0),
-        ];
+        let segments = [segment([0.0, 0.0], [1.0, 0.0], 5.0), segment([0.0, 0.0], [-1.0, 0.0], 5.0), segment([0.0, 0.0], [0.0, 1.0], 5.0)];
         let lines = stitch_contour_polylines(&segments, 1.0e-8, 1.0e-9).unwrap_or_default();
         assert_eq!(lines.len(), 3);
         assert!(lines.iter().all(|line| line.vertices.len() == 2));
@@ -835,11 +786,7 @@ mod tests {
 
     #[test]
     fn rejects_non_finite_contour_segments_and_invalid_tolerances() {
-        let invalid = [TinContourSegment {
-            elevation: 5.0,
-            start: Vec2 { x: f64::NAN, y: 0.0 },
-            end: Vec2 { x: 1.0, y: 0.0 },
-        }];
+        let invalid = [TinContourSegment { elevation: 5.0, start: Vec2 { x: f64::NAN, y: 0.0 }, end: Vec2 { x: 1.0, y: 0.0 } }];
         assert!(stitch_contours(&invalid, 1.0e-6).is_err());
         assert!(stitch_contours(&[], 0.0).is_err());
     }

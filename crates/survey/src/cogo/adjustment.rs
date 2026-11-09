@@ -65,10 +65,7 @@ mod tests {
     #[test]
     fn bowditch_adjustment_closes_and_distributes_correction_by_length() {
         let start = Vec2 { x: 0.0, y: 0.0 };
-        let legs = [
-            TraverseLeg { azimuth_degrees: 90.0, distance: 100.0 },
-            TraverseLeg { azimuth_degrees: 0.0, distance: 100.0 },
-        ];
+        let legs = [TraverseLeg { azimuth_degrees: 90.0, distance: 100.0 }, TraverseLeg { azimuth_degrees: 0.0, distance: 100.0 }];
         let result = bowditch_adjust(start, &legs, Vec2 { x: 100.0, y: 99.0 });
         assert!(result.is_ok());
         if let Ok(result) = result {

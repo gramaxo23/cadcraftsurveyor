@@ -1,6 +1,8 @@
 //! CSV survey import dialog: paste or open point data, preview it, then add CAD entities.
 
-use cadcraft_survey::{MAX_TIN_POINTS, PointFormat, SurveyDrawing, SurveyDrawingEntity, SurveyError, SurveyPoint, Tin, import_points_csv, stitch_contour_polylines};
+use cadcraft_survey::{
+    MAX_TIN_POINTS, PointFormat, SurveyDrawing, SurveyDrawingEntity, SurveyError, SurveyPoint, Tin, import_points_csv, stitch_contour_polylines,
+};
 
 use crate::CadApp;
 
@@ -36,7 +38,6 @@ fn format_name(format: PointFormat) -> &'static str {
         PointFormat::Xyz => "XYZ (Easting, Northing, Elevation)",
     }
 }
-
 
 fn contour_tolerances(points: &[SurveyPoint]) -> (f64, f64) {
     let max_xy = points.iter().fold(1.0_f64, |maximum, point| maximum.max(point.x.abs()).max(point.y.abs()));
@@ -225,7 +226,6 @@ mod tests {
         assert!(result.is_some());
         assert_eq!(app.ui.dialog.as_deref(), Some("surveyimport"));
     }
-
 
     #[test]
     fn terrain_options_create_native_tin_and_contour_geometry() {

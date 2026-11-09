@@ -70,19 +70,23 @@ impl SurveyDrawing {
         }));
     }
 
-
     /// Adds stitched contour components, preserving each component's own elevation.
     pub fn add_contour_polylines(&mut self, contours: &[TinContourPolyline]) {
-        self.entities.extend(contours.iter().filter(|line| {
-            line.vertices.len() >= 2
-                && line.elevation.is_finite()
-                && line.vertices.iter().all(|point| point.x.is_finite() && point.y.is_finite())
-        }).map(|line| SurveyDrawingEntity::Polyline {
-            layer: CONTOUR_LAYER.to_string(),
-            vertices: line.vertices.iter().map(|point| [point.x, point.y, line.elevation]).collect(),
-            closed: line.vertices.first() == line.vertices.last(),
-            elevation: line.elevation,
-        }));
+        self.entities.extend(
+            contours
+                .iter()
+                .filter(|line| {
+                    line.vertices.len() >= 2
+                        && line.elevation.is_finite()
+                        && line.vertices.iter().all(|point| point.x.is_finite() && point.y.is_finite())
+                })
+                .map(|line| SurveyDrawingEntity::Polyline {
+                    layer: CONTOUR_LAYER.to_string(),
+                    vertices: line.vertices.iter().map(|point| [point.x, point.y, line.elevation]).collect(),
+                    closed: line.vertices.first() == line.vertices.last(),
+                    elevation: line.elevation,
+                }),
+        );
     }
 
     /// Adds the unique edges of a TIN as line entities.
@@ -110,15 +114,19 @@ impl SurveyDrawing {
 
     /// Adds the unique edges of a TIN model as native-CAD-ready line primitives.
     pub fn add_tin(&mut self, tin: &Tin) {
-        let triangles: Vec<[[f64; 3]; 3]> = tin.triangles.iter().filter_map(|triangle| {
-            let mut coordinates = [[0.0; 3]; 3];
-            for (slot_index, vertex_index) in triangle.vertices.iter().enumerate() {
-                let point = tin.vertices.get(*vertex_index)?;
-                let slot = coordinates.get_mut(slot_index)?;
-                *slot = [point.x, point.y, point.elevation];
-            }
-            Some(coordinates)
-        }).collect();
+        let triangles: Vec<[[f64; 3]; 3]> = tin
+            .triangles
+            .iter()
+            .filter_map(|triangle| {
+                let mut coordinates = [[0.0; 3]; 3];
+                for (slot_index, vertex_index) in triangle.vertices.iter().enumerate() {
+                    let point = tin.vertices.get(*vertex_index)?;
+                    let slot = coordinates.get_mut(slot_index)?;
+                    *slot = [point.x, point.y, point.elevation];
+                }
+                Some(coordinates)
+            })
+            .collect();
         self.add_tin_edges(&triangles);
     }
 }
@@ -149,7 +157,6 @@ mod tests {
             Some(SurveyDrawingEntity::Polyline { layer, closed: false, elevation: 4.0, .. }) if layer == CONTOUR_LAYER));
     }
 
-
     #[test]
     fn adds_tin_edges_and_levelled_contour_polylines() {
         let tin = Tin {
@@ -162,11 +169,11 @@ mod tests {
         };
         let mut drawing = SurveyDrawing::default();
         drawing.add_tin(&tin);
-        drawing.add_contour_polylines(&[TinContourPolyline {
-            elevation: 5.0,
-            vertices: vec![Vec2 { x: 0.0, y: 0.0 }, Vec2 { x: 1.0, y: 1.0 }],
-        }]);
-        assert_eq!(drawing.entities.iter().filter(|entity| matches!(entity, SurveyDrawingEntity::Line { layer, .. } if layer == TIN_LAYER)).count(), 3);
+        drawing.add_contour_polylines(&[TinContourPolyline { elevation: 5.0, vertices: vec![Vec2 { x: 0.0, y: 0.0 }, Vec2 { x: 1.0, y: 1.0 }] }]);
+        assert_eq!(
+            drawing.entities.iter().filter(|entity| matches!(entity, SurveyDrawingEntity::Line { layer, .. } if layer == TIN_LAYER)).count(),
+            3
+        );
         assert!(drawing.entities.iter().any(|entity| matches!(entity,
             SurveyDrawingEntity::Polyline { layer, elevation: 5.0, .. } if layer == CONTOUR_LAYER)));
     }
