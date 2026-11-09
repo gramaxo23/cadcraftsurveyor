@@ -136,12 +136,12 @@ validated survey adjustment package or a complete Civil 3D workflow**.
 | COGO and traverse | Direct and inverse calculations, whole-circle azimuths, infinite-line intersections, traverse closure diagnostics and Bowditch (compass-rule) adjustment |
 | Coordinate handling | Linear, area and volume unit conversions; separate international-foot and US-survey-foot definitions; CRS metadata validation; 2D affine fit from three controls; redundant unweighted 2D similarity fit with residual, RMS and maximum-residual reporting |
 | Parcels | Polygon area and perimeter calculations |
-| Terrain | Bounded Bowyer–Watson TIN, elevation queries, contour-segment generation and contour stitching; regular elevation grids and grid-based cut/fill |
+| Terrain | Bounded Bowyer–Watson TIN, scale-independent elevation queries, deduplicated contour segments and branch-aware contour polylines; regular elevation grids and grid-based cut/fill |
 | Civil geometry | Horizontal alignment station/offset calculations, station equations, linear vertical-profile interpolation and grade calculations |
 | Cross sections | Section cut/fill area to a datum and average-end-area volume between sections |
 | Construction layout | Instrument-to-design stakeout distance, azimuth and optional elevation differences |
 | CAD integration | Convert survey drawing primitives into native CAD points, 3D polylines and lines; point numbers/descriptions are retained as `CADCRAFT_SURVEY` XDATA |
-| Desktop workflow | `Insert → Survey CSV...` supports PNEZD/PENZD/XYZ, file selection or paste, validation preview and import feedback |
+| Desktop workflow | `Insert → Survey CSV...` supports PNEZD/PENZD/XYZ, file selection or paste, validation preview, optional TIN edge generation and stitched contour import |
 
 ### Importing survey points
 
@@ -150,7 +150,8 @@ validated survey adjustment package or a complete Civil 3D workflow**.
 3. Select PNEZD, PENZD or XYZ and indicate whether the first row is a header.
 4. Open a CSV file or paste the point records.
 5. Review the parsed point preview and any validation errors.
-6. Import only after the preview is correct.
+6. Optionally enable TIN edge lines and/or contour polylines, then set the contour interval.
+7. Import only after the preview and terrain options are correct.
 
 PNEZD means point number, northing, easting, elevation and description. PENZD swaps easting and
 northing. XYZ means easting, northing and elevation; point numbers are generated. Coordinates
@@ -195,7 +196,7 @@ unsupervised construction setting-out, or payment quantities. In particular:
   adjustment and does not provide covariance or statistical outlier tests.
 - The TIN is bounded to 5,000 points, uses floating-point predicates, and does not yet enforce
   breaklines, surface boundaries or holes.
-- Contour stitching is not a full topology-aware network solver.
+- Contour stitching is branch-aware and preserves closed loops, but remains tolerance-based and is not a full robust-predicate terrain topology solver.
 - Grid cut/fill uses complete four-corner cells and does not provide validated TIN-to-TIN
   quantities or project-boundary clipping.
 - Instrument-specific field-book reduction/export, complete survey audit trails and end-to-end

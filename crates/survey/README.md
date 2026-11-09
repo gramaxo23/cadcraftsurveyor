@@ -18,12 +18,12 @@ tested separately and reused by desktop, CLI, MCP and other future clients.
 | Units and CRS metadata | `civil::LinearUnit`, `SurveyCrsMetadata`, axis order and coordinate-use metadata, explicit scale-factor helper |
 | Control fit | Existing three-control affine fit plus redundant unweighted 2D similarity fit with residuals, RMS and maximum residual |
 | Parcels | `parcel_area`, `parcel_perimeter` |
-| Terrain | `Tin`: triangulation, elevation queries, contour segments and contour stitching; regular-grid cut/fill |
+| Terrain | `Tin`: bounded triangulation, scale-independent elevation queries, deduplicated contour segments, branch-aware contour polylines and regular-grid cut/fill |
 | Alignment | `HorizontalAlignment`: stationing, offsets and station equations |
 | Profiles | `VerticalProfile`: linear elevation interpolation and segment grade |
 | Cross sections | `CrossSection`: cut/fill area to a datum; average-end-area volume between sections |
 | Setting-out | `stakeout_deltas`: horizontal distance, whole-circle azimuth and optional elevation difference |
-| CAD-neutral output | `SurveyDrawing` and survey drawing entities for points, parcel geometry, contours and TIN edges |
+| CAD-neutral output | `SurveyDrawing` and survey drawing entities for points, parcel geometry, per-level contour polylines and unique TIN edges |
 
 ## Coordinate and measurement conventions
 
@@ -48,9 +48,12 @@ grid-to-ground convention for the operator.
 
 The desktop application exposes **Insert → Survey CSV...**. It supports PNEZD, PENZD and XYZ,
 file selection or pasted data, an optional header, a parsed-point preview and validation feedback.
-The engine adapter `cadcraft_engine::survey::import_csv` creates native CAD point entities.
-`import_drawing` converts a `SurveyDrawing` into native points, 3D polylines and lines. Survey
-point numbers and descriptions are stored on point entities as `CADCRAFT_SURVEY` XDATA.
+The dialog can optionally generate a TIN edge network and stitched contour polylines from the same
+validated point set. These are imported as native CAD lines and 3D polylines on dedicated survey
+layers. The engine adapter `cadcraft_engine::survey::import_csv` remains available for point-only
+imports; `import_drawing` converts a complete `SurveyDrawing` into native points, 3D polylines
+and lines. Survey point numbers and descriptions are stored on point entities as
+`CADCRAFT_SURVEY` XDATA.
 
 Example engine integration:
 
@@ -80,7 +83,7 @@ fn convert_distance() -> Result<f64, cadcraft_survey::SurveyError> {
 
 - TIN construction is bounded to 5,000 points, uses floating-point predicates and rejects duplicate
   XY coordinates. Breakline constraints, surface boundaries and holes are not implemented.
-- Contour stitching is a simple endpoint walk, not a branch-aware topology solver.
+- Contour stitching builds an endpoint graph, reverses segments as needed, preserves closed loops and splits paths at branch nodes. It is still tolerance-based and is not a robust-predicate terrain topology solver.
 - Grid cut/fill uses four-corner cell averaging, skips incomplete cells and does not clip to
   project boundaries. It is not a TIN-to-TIN quantity engine.
 - Similarity fitting is unweighted and 2D; it does not provide covariance, a stochastic observation

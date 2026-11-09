@@ -10,7 +10,7 @@ pub mod civil;
 pub mod drawing;
 pub mod tin;
 pub use drawing::{SurveyDrawing, SurveyDrawingEntity};
-pub use tin::{Tin, TinContourSegment, Triangle, stitch_contours};
+pub use tin::{MAX_TIN_POINTS, Tin, TinContourPolyline, TinContourSegment, Triangle, stitch_contour_polylines, stitch_contours};
 
 use serde::{Deserialize, Serialize};
 use std::fmt::Write as _;
@@ -79,7 +79,7 @@ pub fn import_points_csv(input: &str, format: PointFormat, has_header: bool) -> 
         return Err(SurveyError::InputTooLarge);
     }
     let mut points = Vec::new();
-    let mut skipped = Vec::new();
+    let skipped = Vec::new();
     let mut first_data = true;
     for (zero_line, raw) in input.lines().enumerate() {
         let line = zero_line + 1;

@@ -1,9 +1,9 @@
-pub mod adjustment;
-
 //! Coordinate geometry (COGO) calculations for surveying workflows.
 //!
 //! Bearings are whole-circle azimuths measured clockwise from grid north, in degrees.
 //! Coordinates use easting (X) and northing (Y), in the drawing's declared linear unit.
+
+pub mod adjustment;
 use crate::{SurveyError, Vec2};
 use serde::{Deserialize, Serialize};
 

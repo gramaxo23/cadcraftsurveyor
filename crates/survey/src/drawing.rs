@@ -5,6 +5,7 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::tin::{Tin, TinContourPolyline};
 use crate::{SurveyPoint, Vec2};
 
 /// Conventional layer names used by the survey drawing adapter.
@@ -69,6 +70,21 @@ impl SurveyDrawing {
         }));
     }
 
+
+    /// Adds stitched contour components, preserving each component's own elevation.
+    pub fn add_contour_polylines(&mut self, contours: &[TinContourPolyline]) {
+        self.entities.extend(contours.iter().filter(|line| {
+            line.vertices.len() >= 2
+                && line.elevation.is_finite()
+                && line.vertices.iter().all(|point| point.x.is_finite() && point.y.is_finite())
+        }).map(|line| SurveyDrawingEntity::Polyline {
+            layer: CONTOUR_LAYER.to_string(),
+            vertices: line.vertices.iter().map(|point| [point.x, point.y, line.elevation]).collect(),
+            closed: line.vertices.first() == line.vertices.last(),
+            elevation: line.elevation,
+        }));
+    }
+
     /// Adds the unique edges of a TIN as line entities.
     pub fn add_tin_edges(&mut self, triangles: &[[[f64; 3]; 3]]) {
         fn compare_point(a: &[f64; 3], b: &[f64; 3]) -> std::cmp::Ordering {
@@ -90,6 +106,20 @@ impl SurveyDrawing {
         edges.sort_by(|left, right| compare_point(&left.0, &right.0).then(compare_point(&left.1, &right.1)));
         edges.dedup_by(|left, right| left.0 == right.0 && left.1 == right.1);
         self.entities.extend(edges.into_iter().map(|edge| SurveyDrawingEntity::Line { layer: TIN_LAYER.to_string(), start: edge.0, end: edge.1 }));
+    }
+
+    /// Adds the unique edges of a TIN model as native-CAD-ready line primitives.
+    pub fn add_tin(&mut self, tin: &Tin) {
+        let triangles: Vec<[[f64; 3]; 3]> = tin.triangles.iter().filter_map(|triangle| {
+            let mut coordinates = [[0.0; 3]; 3];
+            for (slot_index, vertex_index) in triangle.vertices.iter().enumerate() {
+                let point = tin.vertices.get(*vertex_index)?;
+                let slot = coordinates.get_mut(slot_index)?;
+                *slot = [point.x, point.y, point.elevation];
+            }
+            Some(coordinates)
+        }).collect();
+        self.add_tin_edges(&triangles);
     }
 }
 
@@ -117,6 +147,28 @@ mod tests {
             Some(SurveyDrawingEntity::Polyline { layer, closed: true, .. }) if layer == PARCEL_LAYER));
         assert!(matches!(drawing.entities.get(1),
             Some(SurveyDrawingEntity::Polyline { layer, closed: false, elevation: 4.0, .. }) if layer == CONTOUR_LAYER));
+    }
+
+
+    #[test]
+    fn adds_tin_edges_and_levelled_contour_polylines() {
+        let tin = Tin {
+            vertices: vec![
+                SurveyPoint { number: "1".into(), x: 0.0, y: 0.0, elevation: 1.0, description: String::new() },
+                SurveyPoint { number: "2".into(), x: 1.0, y: 0.0, elevation: 2.0, description: String::new() },
+                SurveyPoint { number: "3".into(), x: 0.0, y: 1.0, elevation: 3.0, description: String::new() },
+            ],
+            triangles: vec![crate::tin::Triangle { vertices: [0, 1, 2] }],
+        };
+        let mut drawing = SurveyDrawing::default();
+        drawing.add_tin(&tin);
+        drawing.add_contour_polylines(&[TinContourPolyline {
+            elevation: 5.0,
+            vertices: vec![Vec2 { x: 0.0, y: 0.0 }, Vec2 { x: 1.0, y: 1.0 }],
+        }]);
+        assert_eq!(drawing.entities.iter().filter(|entity| matches!(entity, SurveyDrawingEntity::Line { layer, .. } if layer == TIN_LAYER)).count(), 3);
+        assert!(drawing.entities.iter().any(|entity| matches!(entity,
+            SurveyDrawingEntity::Polyline { layer, elevation: 5.0, .. } if layer == CONTOUR_LAYER)));
     }
 
     #[test]
