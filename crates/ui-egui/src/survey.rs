@@ -302,7 +302,8 @@ mod tests {
         assert!(build_survey_drawing(&form).is_err());
     }
 
- {
+    #[test]
+    fn format_labels_cover_all_supported_csv_layouts() {
         assert!(format_name(PointFormat::Pnezd).starts_with("PNEZD"));
         assert!(format_name(PointFormat::PenZd).starts_with("PENZD"));
         assert!(format_name(PointFormat::Xyz).starts_with("XYZ"));
