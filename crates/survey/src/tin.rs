@@ -184,8 +184,9 @@ fn contour_level_ranges(tin: &Tin, interval: f64) -> Result<Vec<Option<(i64, usi
         if interval <= level_tolerance {
             return Err(SurveyError::InvalidValue("contour interval is below the floating-point resolution of the elevations".into()));
         }
-        let first_level = (min / interval).ceil();
-        let last_level = (max / interval).floor();
+        let ratio_tolerance = level_tolerance / interval;
+        let first_level = (min / interval - ratio_tolerance).ceil();
+        let last_level = (max / interval + ratio_tolerance).floor();
         if !first_level.is_finite() || !last_level.is_finite() {
             return Err(SurveyError::InputTooLarge);
         }
@@ -195,10 +196,13 @@ fn contour_level_ranges(tin: &Tin, interval: f64) -> Result<Vec<Option<(i64, usi
         }
         const MIN_LEVEL_INDEX: f64 = -9_223_372_036_854_775_808.0;
         const MAX_LEVEL_INDEX_EXCLUSIVE: f64 = 9_223_372_036_854_775_808.0;
+        const MAX_EXACT_LEVEL_INDEX: f64 = 9_007_199_254_740_992.0;
         if first_level < MIN_LEVEL_INDEX
             || first_level >= MAX_LEVEL_INDEX_EXCLUSIVE
             || last_level < MIN_LEVEL_INDEX
             || last_level >= MAX_LEVEL_INDEX_EXCLUSIVE
+            || first_level.abs() > MAX_EXACT_LEVEL_INDEX
+            || last_level.abs() > MAX_EXACT_LEVEL_INDEX
         {
             return Err(SurveyError::InputTooLarge);
         }
@@ -227,10 +231,10 @@ fn append_triangle_contour(
     let points = triangle_points(&tin.vertices, triangle)?;
     let min = points.iter().map(|point| point.elevation).fold(f64::INFINITY, f64::min);
     let max = points.iter().map(|point| point.elevation).fold(f64::NEG_INFINITY, f64::max);
-    if level < min || level > max {
+    let level_tolerance = min.abs().max(max.abs()).max(1.0) * f64::EPSILON * 8.0;
+    if elevation_side(level, min, level_tolerance) < 0 || elevation_side(level, max, level_tolerance) > 0 {
         return Ok(());
     }
-    let level_tolerance = min.abs().max(max.abs()).max(1.0) * f64::EPSILON * 8.0;
     let on_level: Vec<usize> = points
         .iter()
         .enumerate()
@@ -743,6 +747,24 @@ mod tests {
         assert!(contours.ok().is_some_and(|segments| {
             segments.iter().any(|item| {
                 (item.elevation - 0.3).abs() < 1.0e-12 && ((item.start.x == 0.0 && item.start.y == 0.0) || (item.end.x == 0.0 && item.end.y == 0.0))
+            })
+        }));
+    }
+
+
+    #[test]
+    fn contour_generation_keeps_decimal_minimum_edges() {
+        let minimum = 0.1 + 0.2;
+        let tin = Tin {
+            vertices: vec![p("1", 0.0, 0.0, minimum), p("2", 1.0, 0.0, minimum), p("3", 0.0, 1.0, 0.6)],
+            triangles: vec![Triangle { vertices: [0, 1, 2] }],
+        };
+        let contours = tin.contour_segments(0.1);
+        assert!(contours.as_ref().is_ok_and(|segments| {
+            segments.iter().any(|item| {
+                (item.elevation - 0.3).abs() < 1.0e-12
+                    && ((item.start.x == 0.0 && item.start.y == 0.0 && item.end.x == 1.0 && item.end.y == 0.0)
+                        || (item.end.x == 0.0 && item.end.y == 0.0 && item.start.x == 1.0 && item.start.y == 0.0))
             })
         }));
     }
