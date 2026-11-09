@@ -192,6 +192,7 @@ impl ParcelBoundary {
 
     /// Formats a parcel summary and edge schedule suitable for text report export.
     /// Units are labelled as drawing units; no CRS or legal area convention is inferred.
+    /// The returned presentation text does not replace a persisted calculation/provenance record.
     pub fn report(&self) -> String {
         let mut out = String::from("CADCraft Parcel Boundary Report\n================================\n");
         let _ = writeln!(out, "Vertices: {}", self.vertices.len());
@@ -435,6 +436,13 @@ mod tests {
             Vec2 { x: 0.0, y: 2.0 },
         ]);
         assert!(backtracking.is_err());
+    }
+
+    #[test]
+    fn edge_table_wraps_the_closing_edge_to_vertex_zero() {
+        let edges = rectangle().edge_table();
+        assert_eq!(edges.last().map(|edge| edge.start_index), Some(3));
+        assert_eq!(edges.last().map(|edge| edge.end_index), Some(0));
     }
 
     #[test]
