@@ -351,11 +351,11 @@ pub fn contours(grid: &ElevationGrid, interval: f64) -> Result<Vec<ContourLine>,
                         };
                         let (pa, za) = corners[ia];
                         let (pb, zb) = corners[ib];
-                        if let (Some(za), Some(zb)) = (za, zb) {
-                            if (za < level && zb > level) || (za > level && zb < level) {
-                                let t = (level - za) / (zb - za);
-                                hits.push(Vec2 { x: pa.x + (pb.x - pa.x) * t, y: pa.y + (pb.y - pa.y) * t });
-                            }
+                        if let (Some(za), Some(zb)) = (za, zb)
+                            && ((za < level && zb > level) || (za > level && zb < level))
+                        {
+                            let t = (level - za) / (zb - za);
+                            hits.push(Vec2 { x: pa.x + (pb.x - pa.x) * t, y: pa.y + (pb.y - pa.y) * t });
                         }
                     }
                     if hits.len() == 2 {

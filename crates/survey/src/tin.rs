@@ -611,7 +611,7 @@ impl ContourGraphBuilder {
                             let elevation_distance = (node.elevation - elevation).abs();
                             if distance <= self.xy_tolerance
                                 && elevation_distance <= self.elevation_tolerance
-                                && matched.map_or(true, |current| *candidate < current)
+                                && matched.is_none_or(|current| *candidate < current)
                             {
                                 matched = Some(*candidate);
                             }
