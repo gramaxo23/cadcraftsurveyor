@@ -69,9 +69,7 @@ impl SurveyDrawing {
             mean_elevation = mean_elevation * ((count - 1.0) / count) + point.elevation / count;
             vertices.push([position.x, position.y, point.elevation]);
         }
-        self.entities.push(SurveyDrawingEntity::Polyline {
-            layer: PARCEL_LAYER.to_string(), vertices, closed: true, elevation: mean_elevation,
-        });
+        self.entities.push(SurveyDrawingEntity::Polyline { layer: PARCEL_LAYER.to_string(), vertices, closed: true, elevation: mean_elevation });
         Ok(boundary.metrics())
     }
 
