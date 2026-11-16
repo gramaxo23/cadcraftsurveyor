@@ -141,7 +141,7 @@ validated survey adjustment package or a complete Civil 3D workflow**.
 | Cross sections | Section cut/fill area to a datum and average-end-area volume between sections |
 | Construction layout | Instrument-to-design stakeout distance, azimuth and optional elevation differences |
 | CAD integration | Convert survey drawing primitives into native CAD points, 3D polylines and lines; point numbers/descriptions are retained as `CADCRAFT_SURVEY` XDATA |
-| Georeferenced imagery | `IMAGEATTACH` accepts an explicit six-line world file and places native raster IMAGE entities with rotated/sheared pixel axes and pixel-centre correction |
+| Georeferenced imagery | `Insert → Georeferenced Raster...` selects an image and world file; `IMAGEATTACH` places native raster IMAGE entities with rotated/sheared pixel axes and pixel-centre correction |
 | Desktop workflow | `Insert → Survey CSV...` supports PNEZD/PENZD/XYZ, file selection or paste, validation preview, optional parcel boundary creation, TIN edge generation and stitched contour import |
 
 ### Importing survey points
@@ -158,6 +158,8 @@ PNEZD means point number, northing, easting, elevation and description. PENZD sw
 northing. XYZ means easting, northing and elevation; point numbers are generated. Coordinates
 are interpreted in the drawing's units. Do not mix datasets with different coordinate systems
 or units.
+
+To place an orthophoto or scanned plan, choose **Insert → Georeferenced Raster...**, select the image and its six-line world file, and attach it as a native raster IMAGE. The world-file coordinates and units must already match the drawing; CADCraft does not reproject the image.
 
 ### Rust API
 
