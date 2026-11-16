@@ -438,7 +438,7 @@ mod tests {
         let transform = Affine2::from_three_controls(source, target);
         assert!(transform.is_ok());
         let mapped = transform.map(|t| t.apply(Vec2 { x: 0.5, y: 0.5 }));
-        assert_eq!(mapped, Some(Vec2 { x: 11.0, y: 21.5 }));
+        assert_eq!(mapped, Ok(Vec2 { x: 11.0, y: 21.5 }));
     }
     #[test]
     fn grid_volume_and_contours_are_computed() {
