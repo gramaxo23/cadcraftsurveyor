@@ -389,10 +389,7 @@ impl WorldFile {
             if count >= values.len() {
                 return Err(SurveyError::InvalidValue("world file must contain exactly six numeric lines".into()));
             }
-            let value = line
-                .trim()
-                .parse::<f64>()
-                .map_err(|_| SurveyError::InvalidValue("world file must contain six numeric lines".into()))?;
+            let value = line.trim().parse::<f64>().map_err(|_| SurveyError::InvalidValue("world file must contain six numeric lines".into()))?;
             if !value.is_finite() {
                 return Err(SurveyError::InvalidValue("world file values must be finite".into()));
             }
@@ -436,23 +433,16 @@ impl WorldFile {
         }
         // Scale before taking the determinant to avoid overflow for large map units and
         // underflow for small pixel sizes. The threshold rejects effectively collinear axes.
-        let determinant = (self.pixel_x / scale) * (self.pixel_y / scale)
-            - (self.rotation_y / scale) * (self.rotation_x / scale);
+        let determinant = (self.pixel_x / scale) * (self.pixel_y / scale) - (self.rotation_y / scale) * (self.rotation_x / scale);
         if !determinant.is_finite() || determinant.abs() <= 64.0 * f64::EPSILON {
             return Err(SurveyError::InvalidValue("world file pixel axes are singular or ill-conditioned".into()));
         }
 
         let top_left = self.pixel_to_map(-0.5, -0.5);
-        let insert = Vec2 {
-            x: top_left.x + self.rotation_x * f64::from(height),
-            y: top_left.y + self.pixel_y * f64::from(height),
-        };
+        let insert = Vec2 { x: top_left.x + self.rotation_x * f64::from(height), y: top_left.y + self.pixel_y * f64::from(height) };
         let pixel_right = Vec2 { x: self.pixel_x, y: self.rotation_y };
         let pixel_up = Vec2 { x: -self.rotation_x, y: -self.pixel_y };
-        if [top_left.x, top_left.y, insert.x, insert.y, pixel_right.x, pixel_right.y, pixel_up.x, pixel_up.y]
-            .iter()
-            .any(|value| !value.is_finite())
-        {
+        if [top_left.x, top_left.y, insert.x, insert.y, pixel_right.x, pixel_right.y, pixel_up.x, pixel_up.y].iter().any(|value| !value.is_finite()) {
             return Err(SurveyError::InvalidValue("world file placement exceeds the supported coordinate range".into()));
         }
 
