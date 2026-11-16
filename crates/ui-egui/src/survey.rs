@@ -1,9 +1,12 @@
 //! CSV survey import dialog: paste or open point data, preview it, then add CAD entities.
 
+use std::io::Read;
+
 use cadcraft_survey::{
     MAX_TIN_POINTS, ParcelBoundary, PointFormat, SurveyDrawing, SurveyDrawingEntity, SurveyError, SurveyPoint, Tin, import_points_csv,
-    stitch_contour_polylines,
+    stitch_contour_polylines, WorldFile,
 };
+use serde_json::json;
 
 use crate::CadApp;
 
@@ -240,6 +243,127 @@ pub fn dialog(app: &mut CadApp, ctx: &egui::Context, open: &mut bool) {
                 }
             }
             Err(error) => app.session.echo(format!("Survey import failed: {error}")),
+        }
+    }
+}
+
+#[derive(Clone, Default)]
+struct RasterForm {
+    image_path: Option<String>,
+    world_file: String,
+    error: Option<String>,
+}
+
+fn read_world_file(path: &str) -> Result<String, String> {
+    let file = std::fs::File::open(path).map_err(|error| format!("Could not open {path}: {error}"))?;
+    let mut bytes = Vec::with_capacity(4096);
+    file.take(4097).read_to_end(&mut bytes).map_err(|error| format!("Could not read {path}: {error}"))?;
+    if bytes.len() > 4096 {
+        return Err("World file exceeds the 4 KiB input limit.".into());
+    }
+    let contents = String::from_utf8(bytes).map_err(|error| format!("World file is not UTF-8: {error}"))?;
+    WorldFile::parse(&contents).map_err(|error| format!("Invalid world file: {error}"))?;
+    Ok(contents)
+}
+
+/// Attach an image as a native IMAGE entity using an explicit six-line world file.
+pub fn raster_dialog(app: &mut CadApp, ctx: &egui::Context, open: &mut bool) {
+    let id = egui::Id::new("cadcraft_survey_georeferenced_raster");
+    let mut form = ctx.data(|data| data.get_temp::<RasterForm>(id)).unwrap_or_default();
+    let mut do_attach = false;
+    let mut close_requested = false;
+    let has_drawing = app.session.doc().is_ok();
+
+    egui::Window::new("Attach Georeferenced Raster").id(id).open(open).resizable(true).default_width(560.0).show(ctx, |ui| {
+        ui.label("Attach an orthophoto, scanned plan or other raster using its world-file transform.");
+        ui.small("The six world-file values are A, D, B, E, C, F. Coordinates and units must already match the drawing.");
+
+        #[cfg(not(target_arch = "wasm32"))]
+        if !app.services.no_file_system
+            && ui.button("Choose raster image...").clicked()
+            && let Some(path) = app.services.pick_open.as_ref().and_then(|pick| pick())
+        {
+            form.image_path = Some(path);
+            form.error = None;
+        }
+        if let Some(path) = &form.image_path {
+            ui.small(format!("Raster: {path}"));
+        } else {
+            ui.small("No raster image selected.");
+        }
+
+        #[cfg(not(target_arch = "wasm32"))]
+        if !app.services.no_file_system
+            && ui.button("Choose world file...").clicked()
+            && let Some(path) = app.services.pick_open.as_ref().and_then(|pick| pick())
+        {
+            match read_world_file(&path) {
+                Ok(contents) => {
+                    form.world_file = contents;
+                    form.error = None;
+                }
+                Err(error) => form.error = Some(error),
+            }
+        }
+
+        ui.label("World file (six numeric lines, A / D / B / E / C / F):");
+        ui.add(
+            egui::TextEdit::multiline(&mut form.world_file)
+                .desired_rows(6)
+                .desired_width(f32::INFINITY)
+                .hint_text("0.25\n0\n0\n-0.25\n500000.125\n4500000.125"),
+        );
+
+        let world_valid = match WorldFile::parse(&form.world_file) {
+            Ok(_) => true,
+            Err(error) if !form.world_file.trim().is_empty() => {
+                ui.colored_label(ui.visuals().error_fg_color, format!("Invalid world file: {error}"));
+                false
+            }
+            Err(_) => false,
+        };
+        if let Some(error) = &form.error {
+            ui.colored_label(ui.visuals().error_fg_color, error.as_str());
+        }
+        if !cfg!(target_arch = "wasm32") && !has_drawing {
+            ui.colored_label(ui.visuals().error_fg_color, "Open a drawing before attaching a raster.");
+        }
+        if cfg!(target_arch = "wasm32") {
+            ui.small("Local raster file picking is available in the desktop application.");
+        }
+
+        ui.separator();
+        ui.horizontal(|ui| {
+            if ui.add_enabled(
+                has_drawing && form.image_path.is_some() && world_valid && !app.services.no_file_system,
+                egui::Button::new("Attach raster"),
+            ).clicked() {
+                do_attach = true;
+            }
+            if ui.button("Close").clicked() {
+                close_requested = true;
+            }
+        });
+    });
+
+    ctx.data_mut(|data| data.insert_temp(id, form.clone()));
+    if close_requested {
+        *open = false;
+    }
+    if do_attach
+        && let Some(path) = form.image_path.as_deref()
+    {
+        match app.run("imageattach", json!({ "path": path, "worldFile": form.world_file })) {
+            Ok(value) => {
+                let label = value.get("name").and_then(serde_json::Value::as_str).unwrap_or("raster");
+                app.session.echo(format!("Attached georeferenced raster {label}."));
+                *open = false;
+                ctx.data_mut(|data| data.remove::<RasterForm>(id));
+            }
+            Err(error) => {
+                form.error = Some(error);
+                ctx.data_mut(|data| data.insert_temp(id, form));
+            }
         }
     }
 }
