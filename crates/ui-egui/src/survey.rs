@@ -83,7 +83,7 @@ pub fn dialog(app: &mut CadApp, ctx: &egui::Context, open: &mut bool) {
         ui.small("Optional terrain output is generated from the same validated point set.");
         ui.horizontal(|ui| {
             ui.label("CSV format");
-            egui::ComboBox::from_id_salt("survey_csv_format")
+            craft_ui::ComboBox::from_id_salt("survey_csv_format")
                 .selected_text(match form.format {
                     PointFormat::Pnezd => "PNEZD",
                     PointFormat::PenZd => "PENZD",
@@ -98,15 +98,16 @@ pub fn dialog(app: &mut CadApp, ctx: &egui::Context, open: &mut bool) {
         });
 
         #[cfg(not(target_arch = "wasm32"))]
-        if !app.services.no_file_system && ui.button("Open CSV file...").clicked() {
-            if let Some(path) = app.services.pick_open.as_ref().and_then(|pick| pick()) {
-                match std::fs::read_to_string(&path) {
-                    Ok(contents) => {
-                        form.csv = contents;
-                        form.file_error = None;
-                    }
-                    Err(error) => form.file_error = Some(format!("Could not read {path}: {error}")),
+        if !app.services.no_file_system
+            && ui.button("Open CSV file...").clicked()
+            && let Some(path) = app.services.pick_open.as_ref().and_then(|pick| pick())
+        {
+            match std::fs::read_to_string(&path) {
+                Ok(contents) => {
+                    form.csv = contents;
+                    form.file_error = None;
                 }
+                Err(error) => form.file_error = Some(format!("Could not read {path}: {error}")),
             }
         }
 
