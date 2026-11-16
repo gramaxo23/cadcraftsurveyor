@@ -24,6 +24,7 @@ tested separately and reused by desktop, CLI, MCP and other future clients.
 | Cross sections | `CrossSection`: cut/fill area to a datum; average-end-area volume between sections |
 | Setting-out | `stakeout_deltas`: horizontal distance, whole-circle azimuth and optional elevation difference |
 | CAD-neutral output | `SurveyDrawing` and survey drawing entities for points, parcel geometry, per-level contour polylines and unique TIN edges |
+| Georeferenced imagery | `WorldFile::parse`, `WorldFile::pixel_to_map`, `WorldFile::image_placement`: bounded six-line world-file parsing and native IMAGE pixel-basis placement, including rotation and shear |
 
 ## Coordinate and measurement conventions
 
@@ -67,6 +68,24 @@ fn import_control_points() -> Result<usize, Box<dyn std::error::Error>> {
     Ok(count)
 }
 ```
+
+## Georeferenced raster overlays
+
+The existing CAD IMAGE entity and raster decoder can be used with a world file through the IMAGEATTACH command. Pass the standard six world-file values in this order: A, D, B, E, C, F. The image's pixel dimensions come from the decoded image, not from the world file.
+
+```json
+{
+  "command": "imageattach",
+  "params": {
+    "path": "site-orthophoto.tif",
+    "worldFile": "0.25\n0\n0\n-0.25\n500000.125\n4500000.125"
+  }
+}
+```
+
+WorldFile::image_placement(width, height) converts pixel-centre coordinates to CADCraft's IMAGE entity convention: lower-left outer insertion point, one-pixel right vector and one-pixel up vector. It applies the half-pixel offset, preserves rotated/sheared pixel axes, rejects near-singular transforms and bounds image dimensions. The image remains an external file reference and is rendered by the existing raster pipeline.
+
+The world file does not identify a CRS. The image coordinates and units must already match the drawing. No .prj discovery, raster reprojection, datum/geoid transformation, resampling or warping is performed. Confirm alignment against independent control before using the overlay for measurement.
 
 ## Calculation examples
 
@@ -122,7 +141,7 @@ drawing units; supply and verify the project's CRS, units and legal area convent
 - Raw field observations, field-book reduction, instrument-specific formats and full import
   provenance/audit reports are not implemented. Parcel reports are plain text and do not yet carry persisted CRS/unit provenance or statutory boundary metadata.
 - CRS metadata is not yet persisted and enforced through every project, import, export and report.
-- World-file coordinate mapping is not a complete georeferenced raster workflow.
+- IMAGEATTACH can place an image from an explicit six-line world file, including rotation and shear, but it does not discover sidecar files or CRS metadata, reproject/warp pixels, or transform datums. The world-file coordinates and units must already match the drawing.
 - No independent company control datasets or third-party reference calculations have been run.
 
 ## Tests and development
