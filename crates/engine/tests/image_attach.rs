@@ -96,18 +96,11 @@ fn world_file_places_a_georeferenced_image_at_its_pixel_edges() {
     let image = images(&s).pop();
     assert!(image.is_some());
     if let Some(image) = image {
-        assert_eq!(
-            (image.insert.x, image.insert.y, image.u.x, image.u.y, image.v.x, image.v.y),
-            (99.0, 197.0, 2.0, 0.0, 0.0, 2.0)
-        );
+        assert_eq!((image.insert.x, image.insert.y, image.u.x, image.u.y, image.v.x, image.v.y), (99.0, 197.0, 2.0, 0.0, 0.0, 2.0));
         assert_eq!((image.size.x, image.size.y), (4.0, 2.0));
     }
 
-    let display = cadcraft_engine::render::build(
-        s.doc().unwrap(),
-        &cadcraft_engine::doc::Space::Model,
-        &cadcraft_engine::render::Options::default(),
-    );
+    let display = cadcraft_engine::render::build(s.doc().unwrap(), &cadcraft_engine::doc::Space::Model, &cadcraft_engine::render::Options::default());
     let placed = display.images.first();
     assert!(placed.is_some());
     if let Some(placed) = placed {
