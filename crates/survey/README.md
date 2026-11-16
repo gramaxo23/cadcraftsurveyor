@@ -71,7 +71,7 @@ fn import_control_points() -> Result<usize, Box<dyn std::error::Error>> {
 
 ## Georeferenced raster overlays
 
-The existing CAD IMAGE entity and raster decoder can be used with a world file through the IMAGEATTACH command. Pass the standard six world-file values in this order: A, D, B, E, C, F. The image's pixel dimensions come from the decoded image, not from the world file.
+The desktop menu **Insert → Georeferenced Raster...** selects a raster image and its world file, validates the six-line transform and creates a native CAD IMAGE entity. The same capability is available through the IMAGEATTACH command/API. Pass the standard six world-file values in this order: A, D, B, E, C, F. The image's pixel dimensions come from the decoded image, not from the world file.
 
 ```json
 {
