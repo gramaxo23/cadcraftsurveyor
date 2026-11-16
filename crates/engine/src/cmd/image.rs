@@ -9,6 +9,7 @@ use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 
 use cadcraft_doc::{Drawing, EntityKind, Image, Raster};
 use cadcraft_geom::Vec2;
+use cadcraft_survey::WorldFile;
 use serde_json::{Value, json};
 
 use super::file::base64_decode;
@@ -32,7 +33,7 @@ pub fn specs() -> Vec<CommandSpec> {
         CommandSpec::new("imageattach", "Raster Image Reference...", run_imageattach).alias(&["iat"]).params(
             "{path: PNG/JPEG/BMP/TIFF file (saved as given; a relative path is relative to this drawing's folder), data?: base64 file contents \
              (instead of reading `path`), at?: [x,y] lower-left corner (default 0,0), scale?: number (default 1: the image is one drawing unit \
-             wide), width?: width in drawing units (instead of `scale`), rotation? (degrees), name? (default: the file name)} → {name, handle, \
+             wide), width?: width in drawing units (instead of `scale`), rotation? (degrees), worldFile?: six A,D,B,E,C,F lines (georeferenced; mutually exclusive with `at`, `scale`, `width` and `rotation`), name? (default: the file name)} → {name, handle, \
              path, pixels: [w, h], size: [w, h]}",
         ),
         CommandSpec::new("image", "Raster Images", run_image)
@@ -246,20 +247,41 @@ pub(crate) fn run_imageattach(s: &mut Session, p: &Value) -> Result<Value> {
     if path.len() > MAX_PATH {
         return Err(bad(ID, "`path` is too long"));
     }
-    let place = placement(p)?;
     let raster = pixels(s, p, &path)?;
     let (w, h) = (f64::from(raster.width()), f64::from(raster.height()));
-    // One pixel in drawing units, along the image's bottom edge (`u`) and its left edge (`v`).
-    let pixel = place.width / w;
-    let u = Vec2::from_angle(place.rotation) * pixel;
-    let v = u.perp();
-    if !(pixel.is_normal() && (pixel * h).is_normal() && u.x.is_finite() && u.y.is_finite()) {
-        return Err(bad(ID, "the image would be too small or too large to draw"));
-    }
+    let (insert, u, v, physical_width, physical_height) = if let Some(world_file) = p.get("worldFile") {
+        if !world_file.is_string() {
+            return Err(bad(ID, "`worldFile` must be six lines of A, D, B, E, C, F numeric values"));
+        }
+        if ["at", "scale", "width", "rotation"].iter().any(|key| p.get(*key).is_some()) {
+            return Err(bad(ID, "`worldFile` cannot be combined with `at`, `scale`, `width` or `rotation`"));
+        }
+        let text = world_file.as_str().ok_or_else(|| bad(ID, "invalid world file"))?;
+        let world = WorldFile::parse(text).map_err(|error| bad(ID, error.to_string()))?;
+        let placement = world.image_placement(raster.width(), raster.height()).map_err(|error| bad(ID, error.to_string()))?;
+        let u = Vec2::new(placement.pixel_right.x, placement.pixel_right.y);
+        let v = Vec2::new(placement.pixel_up.x, placement.pixel_up.y);
+        let physical_width = u.x.hypot(u.y) * w;
+        let physical_height = v.x.hypot(v.y) * h;
+        if !(physical_width.is_normal() && physical_height.is_normal()) {
+            return Err(bad(ID, "the world-file image would be too small or too large to draw"));
+        }
+        (Vec2::new(placement.insert.x, placement.insert.y), u, v, physical_width, physical_height)
+    } else {
+        let place = placement(p)?;
+        // One pixel in drawing units, along the image's bottom edge (u) and its left edge (v).
+        let pixel = place.width / w;
+        let u = Vec2::from_angle(place.rotation) * pixel;
+        let v = u.perp();
+        if !(pixel.is_normal() && (pixel * h).is_normal() && u.x.is_finite() && u.y.is_finite()) {
+            return Err(bad(ID, "the image would be too small or too large to draw"));
+        }
+        (place.at, u, v, place.width, pixel * h)
+    };
     let wanted = str_param(p, "name").map(str::trim).filter(|n| !n.is_empty()).map(str::to_string).unwrap_or_else(|| stem(&path));
     let name = def_name(s.doc()?, &path, &wanted);
     let image = Image {
-        insert: place.at.to3(0.0),
+        insert: insert.to3(0.0),
         u: u.to3(0.0),
         v: v.to3(0.0),
         size: Vec2::new(w, h),
@@ -269,7 +291,7 @@ pub(crate) fn run_imageattach(s: &mut Session, p: &Value) -> Result<Value> {
     };
     s.doc_mut()?.rasters.insert(&path, raster);
     let handle = s.add_entity(EntityKind::Image(image))?;
-    Ok(json!({ "name": name, "handle": handle.hex(), "path": path, "pixels": [w, h], "size": [place.width, pixel * h] }))
+    Ok(json!({ "name": name, "handle": handle.hex(), "path": path, "pixels": [w, h], "size": [physical_width, physical_height] }))
 }
 
 /// Where and how large IMAGEATTACH puts the image.
