@@ -84,6 +84,7 @@ pub const UI_COMMANDS: &[(&str, &str, &[&str], Option<&str>)] = &[
     ("ui.dock.reset", "Reset Panel Layout", &["Window", "Reset Panel Layout"], None),
     ("ui.open", "Open...", &[], Some("Cmd+O")),
     ("ui.survey.import", "Import Survey CSV...", &["Insert", "Survey CSV..."], None),
+    ("ui.survey.raster", "Attach Georeferenced Raster...", &["Insert", "Georeferenced Raster..."], None),
     ("ui.newtemplate", "New from Template...", &["File", "New from Template..."], None),
     ("ui.saveas", "Save As...", &[], None),
     ("ui.sample", "Open Sample Drawing", &["Help", "Open Sample Drawing"], None),
@@ -153,6 +154,10 @@ pub fn run_ui_command(app: &mut CadApp, id: &str, params: &Value) -> Option<Resu
 fn route_ui_subsystems(app: &mut CadApp, id: &str, params: &Value) -> Option<Result<Value, String>> {
     if id == "ui.survey.import" || (id == "surveyimport" && params.is_null()) {
         app.ui.dialog = Some("surveyimport".into());
+        return Some(Ok(Value::Null));
+    }
+    if id == "ui.survey.raster" || (id == "surveyraster" && params.is_null()) {
+        app.ui.dialog = Some("surveyraster".into());
         return Some(Ok(Value::Null));
     }
     if let Some(result) = crate::spacemouse::route(app, id, params) {
