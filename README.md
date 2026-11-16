@@ -141,6 +141,7 @@ validated survey adjustment package or a complete Civil 3D workflow**.
 | Cross sections | Section cut/fill area to a datum and average-end-area volume between sections |
 | Construction layout | Instrument-to-design stakeout distance, azimuth and optional elevation differences |
 | CAD integration | Convert survey drawing primitives into native CAD points, 3D polylines and lines; point numbers/descriptions are retained as `CADCRAFT_SURVEY` XDATA |
+| Georeferenced imagery | `IMAGEATTACH` accepts an explicit six-line world file and places native raster IMAGE entities with rotated/sheared pixel axes and pixel-centre correction |
 | Desktop workflow | `Insert → Survey CSV...` supports PNEZD/PENZD/XYZ, file selection or paste, validation preview, optional parcel boundary creation, TIN edge generation and stitched contour import |
 
 ### Importing survey points
@@ -204,6 +205,7 @@ unsupervised construction setting-out, or payment quantities. In particular:
   quantities or project-boundary clipping.
 - Instrument-specific field-book reduction/export, complete survey audit trails and end-to-end
   persistence of coordinate metadata are not yet available.
+- World-file image placement does not discover sidecars or CRS metadata, reproject/warp pixels, or transform datums; raster coordinates and units must already match the drawing.
 - Survey-specific DXF/DWG round-trip verification and independent company-control validation
   remain release gates.
 
