@@ -439,10 +439,31 @@ impl WorldFile {
         }
 
         let top_left = self.pixel_to_map(-0.5, -0.5);
+        let right_step = Vec2 { x: top_left.x + self.pixel_x, y: top_left.y + self.rotation_y };
+        let down_step = Vec2 { x: top_left.x + self.rotation_x, y: top_left.y + self.pixel_y };
+        if right_step == top_left || down_step == top_left {
+            return Err(SurveyError::InvalidValue("world file pixel size is below the coordinate precision at its origin".into()));
+        }
         let insert = Vec2 { x: top_left.x + self.rotation_x * f64::from(height), y: top_left.y + self.pixel_y * f64::from(height) };
         let pixel_right = Vec2 { x: self.pixel_x, y: self.rotation_y };
         let pixel_up = Vec2 { x: -self.rotation_x, y: -self.pixel_y };
-        if [top_left.x, top_left.y, insert.x, insert.y, pixel_right.x, pixel_right.y, pixel_up.x, pixel_up.y].iter().any(|value| !value.is_finite()) {
+        if [
+            top_left.x,
+            top_left.y,
+            right_step.x,
+            right_step.y,
+            down_step.x,
+            down_step.y,
+            insert.x,
+            insert.y,
+            pixel_right.x,
+            pixel_right.y,
+            pixel_up.x,
+            pixel_up.y,
+        ]
+        .iter()
+        .any(|value| !value.is_finite())
+        {
             return Err(SurveyError::InvalidValue("world file placement exceeds the supported coordinate range".into()));
         }
 
@@ -563,6 +584,8 @@ mod tests {
 
         let overflow = WorldFile::parse("1e308\n0\n0\n-1e308\n0\n0");
         assert!(overflow.is_ok_and(|value| value.image_placement(4, 2).is_err()));
+        let below_precision = WorldFile::parse("1e-6\n0\n0\n-1e-6\n1e12\n1e12");
+        assert!(below_precision.is_ok_and(|value| value.image_placement(4, 2).is_err()));
         assert!(WorldFile::parse("1\n0\n0\n-1\n0\n0\nextra").is_err());
         assert!(WorldFile::parse(&"1".repeat(4097)).is_err());
     }
