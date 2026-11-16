@@ -3,8 +3,8 @@
 use std::io::Read;
 
 use cadcraft_survey::{
-    MAX_TIN_POINTS, ParcelBoundary, PointFormat, SurveyDrawing, SurveyDrawingEntity, SurveyError, SurveyPoint, Tin, import_points_csv,
-    stitch_contour_polylines, WorldFile,
+    MAX_TIN_POINTS, ParcelBoundary, PointFormat, SurveyDrawing, SurveyDrawingEntity, SurveyError, SurveyPoint, Tin, WorldFile, import_points_csv,
+    stitch_contour_polylines,
 };
 use serde_json::json;
 
@@ -334,10 +334,13 @@ pub fn raster_dialog(app: &mut CadApp, ctx: &egui::Context, open: &mut bool) {
 
         ui.separator();
         ui.horizontal(|ui| {
-            if ui.add_enabled(
-                has_drawing && form.image_path.is_some() && world_valid && !app.services.no_file_system,
-                egui::Button::new("Attach raster"),
-            ).clicked() {
+            if ui
+                .add_enabled(
+                    has_drawing && form.image_path.is_some() && world_valid && !app.services.no_file_system,
+                    egui::Button::new("Attach raster"),
+                )
+                .clicked()
+            {
                 do_attach = true;
             }
             if ui.button("Close").clicked() {
@@ -350,9 +353,7 @@ pub fn raster_dialog(app: &mut CadApp, ctx: &egui::Context, open: &mut bool) {
     if close_requested {
         *open = false;
     }
-    if do_attach
-        && let Some(path) = form.image_path.as_deref()
-    {
+    if do_attach && let Some(path) = form.image_path.as_deref() {
         match app.run("imageattach", json!({ "path": path, "worldFile": form.world_file })) {
             Ok(value) => {
                 let label = value.get("name").and_then(serde_json::Value::as_str).unwrap_or("raster");
