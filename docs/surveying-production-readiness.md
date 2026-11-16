@@ -25,7 +25,7 @@ The following are not yet sufficient for production surveying:\n\n- Parcel editi
 - Contour stitching caps input at 1,000,000 segments and builds a tolerance-based endpoint graph with separate XY/elevation tolerances. It supports reversed segments, closed loops and branch splitting, but does not replace robust-predicate topology or breakline/boundary enforcement.
 - Grid cut/fill uses four-corner cell averaging, skips incomplete cells and does not clip to a project boundary. It is not a validated TIN-to-TIN earthworks calculation.
 - CSV import supports a deliberately narrow set of formats; PNEZD export and description-code grouping are available, but instrument-specific export, field-book reduction, raw observation storage and comprehensive import audit trails are not provided.
-- IMAGEATTACH now accepts an explicit six-line worldFile value and creates a native IMAGE entity using the decoded raster dimensions, half-pixel correction and affine pixel basis. It does not discover world-file sidecars or CRS metadata, reproject/warp imagery, or perform datum/geoid transformations; the raster coordinates and units must already match the drawing.
+- The desktop Insert → Georeferenced Raster dialog and IMAGEATTACH command accept an explicit six-line worldFile value and create a native IMAGE entity using the decoded raster dimensions, half-pixel correction and affine pixel basis. It does not discover world-file sidecars or CRS metadata, reproject/warp imagery, or perform datum/geoid transformations; the raster coordinates and units must already match the drawing.
 - No company control dataset or independent reference calculations have been supplied or run.
 
 ## Release checklist
