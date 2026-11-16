@@ -1029,6 +1029,17 @@ mod tests {
     }
 
     #[test]
+    fn georeferenced_raster_menu_and_command_open_the_attachment_dialog() {
+        let mut app = CadApp::new(Session::new(), Services::default());
+        app.start("ui.survey.raster");
+        assert_eq!(app.ui.dialog.as_deref(), Some("surveyraster"));
+
+        app.ui.dialog = None;
+        app.start("surveyraster");
+        assert_eq!(app.ui.dialog.as_deref(), Some("surveyraster"));
+    }
+
+    #[test]
     fn every_shown_shortcut_runs_its_command() {
         // Handled outside the table: Delete by the command line (it erases the selection only when
         // the line is empty), Cmd+8 before it (QuickCalc's own field keeps focus), Cmd+Q by the
