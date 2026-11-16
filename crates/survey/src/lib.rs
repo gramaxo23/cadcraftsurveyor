@@ -364,6 +364,19 @@ pub struct WorldFile {
     pub origin_y: f64,
 }
 
+/// The native IMAGE entity placement derived from a world file.
+///
+/// insert is the lower-left outer corner. pixel_right and pixel_up are the one-pixel
+/// basis vectors stored by CADCraft's IMAGE entity; size remains the raster's pixel dimensions.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+pub struct GeoreferencedImagePlacement {
+    pub insert: Vec2,
+    pub pixel_right: Vec2,
+    pub pixel_up: Vec2,
+    pub width: u32,
+    pub height: u32,
+}
+
 impl WorldFile {
     /// Parses the six standard world-file lines (A, D, B, E, C, F).
     pub fn parse(text: &str) -> Result<Self, SurveyError> {
@@ -384,6 +397,52 @@ impl WorldFile {
     /// Converts pixel-center coordinates (column, row) to map coordinates.
     pub fn pixel_to_map(&self, column: f64, row: f64) -> Vec2 {
         Vec2 { x: self.pixel_x * column + self.rotation_x * row + self.origin_x, y: self.rotation_y * column + self.pixel_y * row + self.origin_y }
+    }
+
+    /// Converts this world file into the placement expected by a native CAD IMAGE entity.
+    ///
+    /// World files locate pixel centres and number rows downwards. CADCraft's IMAGE entity
+    /// stores the lower-left outer corner and a one-pixel-up vector, so this method applies
+    /// the half-pixel shift and vertical-axis reversal explicitly. Rotated and sheared grids
+    /// are preserved. Near-singular transforms and unreasonable raster dimensions are rejected.
+    pub fn image_placement(&self, width: u32, height: u32) -> Result<GeoreferencedImagePlacement, SurveyError> {
+        const MAX_PIXELS: u64 = 128_000_000;
+        let pixels = u64::from(width).checked_mul(u64::from(height)).ok_or(SurveyError::InputTooLarge)?;
+        if width == 0 || height == 0 || pixels > MAX_PIXELS {
+            return Err(SurveyError::InvalidValue("raster dimensions must be non-zero and no more than 128 megapixels".into()));
+        }
+
+        let basis = [self.pixel_x, self.rotation_y, self.rotation_x, self.pixel_y];
+        if basis.iter().any(|value| !value.is_finite()) || !self.origin_x.is_finite() || !self.origin_y.is_finite() {
+            return Err(SurveyError::InvalidValue("world file values must be finite".into()));
+        }
+        let scale = basis.iter().fold(0.0_f64, |maximum, value| maximum.max(value.abs()));
+        if scale == 0.0 || !scale.is_finite() {
+            return Err(SurveyError::InvalidValue("world file pixel basis is degenerate".into()));
+        }
+        // Scale before taking the determinant to avoid overflow for large map units and
+        // underflow for small pixel sizes. The threshold rejects effectively collinear axes.
+        let determinant = (self.pixel_x / scale) * (self.pixel_y / scale)
+            - (self.rotation_y / scale) * (self.rotation_x / scale);
+        if !determinant.is_finite() || determinant.abs() <= 64.0 * f64::EPSILON {
+            return Err(SurveyError::InvalidValue("world file pixel axes are singular or ill-conditioned".into()));
+        }
+
+        let top_left = self.pixel_to_map(-0.5, -0.5);
+        let insert = Vec2 {
+            x: top_left.x + self.rotation_x * f64::from(height),
+            y: top_left.y + self.pixel_y * f64::from(height),
+        };
+        let pixel_right = Vec2 { x: self.pixel_x, y: self.rotation_y };
+        let pixel_up = Vec2 { x: -self.rotation_x, y: -self.pixel_y };
+        if [top_left.x, top_left.y, insert.x, insert.y, pixel_right.x, pixel_right.y, pixel_up.x, pixel_up.y]
+            .iter()
+            .any(|value| !value.is_finite())
+        {
+            return Err(SurveyError::InvalidValue("world file placement exceeds the supported coordinate range".into()));
+        }
+
+        Ok(GeoreferencedImagePlacement { insert, pixel_right, pixel_up, width, height })
     }
 }
 
@@ -455,5 +514,50 @@ mod tests {
     fn world_file_maps_pixel_centres() {
         let world = WorldFile::parse("2\n0\n0\n-2\n100\n200");
         assert_eq!(world.map(|w| w.pixel_to_map(1.0, 1.0)), Ok(Vec2 { x: 102.0, y: 198.0 }));
+    }
+
+    #[test]
+    fn world_file_places_north_up_raster_on_pixel_edges() {
+        let world = WorldFile::parse("2\n0\n0\n-2\n100\n200");
+        let placement = world.and_then(|value| value.image_placement(4, 2));
+        assert_eq!(
+            placement,
+            Ok(GeoreferencedImagePlacement {
+                insert: Vec2 { x: 99.0, y: 197.0 },
+                pixel_right: Vec2 { x: 2.0, y: 0.0 },
+                pixel_up: Vec2 { x: 0.0, y: 2.0 },
+                width: 4,
+                height: 2,
+            })
+        );
+    }
+
+    #[test]
+    fn world_file_preserves_rotation_and_shear() {
+        let world = WorldFile::parse("0\n3\n-2\n0\n100\n200");
+        let placement = world.and_then(|value| value.image_placement(4, 2));
+        assert_eq!(
+            placement,
+            Ok(GeoreferencedImagePlacement {
+                insert: Vec2 { x: 97.0, y: 198.5 },
+                pixel_right: Vec2 { x: 0.0, y: 3.0 },
+                pixel_up: Vec2 { x: 2.0, y: 0.0 },
+                width: 4,
+                height: 2,
+            })
+        );
+    }
+
+    #[test]
+    fn world_file_rejects_singular_dimensions_and_overflow() {
+        let singular = WorldFile::parse("1\n2\n2\n4\n0\n0").and_then(|value| value.image_placement(4, 2));
+        assert!(singular.is_err());
+
+        let valid = WorldFile::parse("1\n0\n0\n-1\n0\n0");
+        assert!(valid.is_ok_and(|value| value.image_placement(0, 2).is_err()));
+        assert!(valid.is_ok_and(|value| value.image_placement(u32::MAX, u32::MAX).is_err()));
+
+        let overflow = WorldFile::parse("1e308\n0\n0\n-1e308\n0\n0");
+        assert!(overflow.is_ok_and(|value| value.image_placement(4, 2).is_err()));
     }
 }
