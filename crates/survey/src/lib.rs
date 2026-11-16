@@ -579,8 +579,8 @@ mod tests {
         assert!(singular.is_err());
 
         let valid = WorldFile::parse("1\n0\n0\n-1\n0\n0");
-        assert!(valid.is_ok_and(|value| value.image_placement(0, 2).is_err()));
-        assert!(valid.is_ok_and(|value| value.image_placement(u32::MAX, u32::MAX).is_err()));
+        assert!(valid.as_ref().is_ok_and(|value| value.image_placement(0, 2).is_err()));
+        assert!(valid.as_ref().is_ok_and(|value| value.image_placement(u32::MAX, u32::MAX).is_err()));
 
         let overflow = WorldFile::parse("1e308\n0\n0\n-1e308\n0\n0");
         assert!(overflow.is_ok_and(|value| value.image_placement(4, 2).is_err()));
