@@ -380,18 +380,31 @@ pub struct GeoreferencedImagePlacement {
 impl WorldFile {
     /// Parses the six standard world-file lines (A, D, B, E, C, F).
     pub fn parse(text: &str) -> Result<Self, SurveyError> {
-        let values: Result<Vec<f64>, _> = text.lines().map(|line| line.trim().parse::<f64>()).collect();
-        let values = values.map_err(|_| SurveyError::InvalidValue("world file must contain six numeric lines".into()))?;
-        if values.len() != 6 || values.iter().any(|v| !v.is_finite()) {
-            return Err(SurveyError::InvalidValue("world file must contain six finite values".into()));
+        if text.len() > 4096 {
+            return Err(SurveyError::InputTooLarge);
         }
-        let mut it = values.into_iter();
-        let pixel_x = it.next().ok_or_else(|| SurveyError::InvalidValue("missing A".into()))?;
-        let rotation_y = it.next().ok_or_else(|| SurveyError::InvalidValue("missing D".into()))?;
-        let rotation_x = it.next().ok_or_else(|| SurveyError::InvalidValue("missing B".into()))?;
-        let pixel_y = it.next().ok_or_else(|| SurveyError::InvalidValue("missing E".into()))?;
-        let origin_x = it.next().ok_or_else(|| SurveyError::InvalidValue("missing C".into()))?;
-        let origin_y = it.next().ok_or_else(|| SurveyError::InvalidValue("missing F".into()))?;
+        let mut values = [0.0_f64; 6];
+        let mut count = 0usize;
+        for line in text.lines() {
+            if count >= values.len() {
+                return Err(SurveyError::InvalidValue("world file must contain exactly six numeric lines".into()));
+            }
+            let value = line
+                .trim()
+                .parse::<f64>()
+                .map_err(|_| SurveyError::InvalidValue("world file must contain six numeric lines".into()))?;
+            if !value.is_finite() {
+                return Err(SurveyError::InvalidValue("world file values must be finite".into()));
+            }
+            if let Some(slot) = values.get_mut(count) {
+                *slot = value;
+            }
+            count += 1;
+        }
+        if count != values.len() {
+            return Err(SurveyError::InvalidValue("world file must contain exactly six numeric lines".into()));
+        }
+        let [pixel_x, rotation_y, rotation_x, pixel_y, origin_x, origin_y] = values;
         Ok(Self { pixel_x, rotation_y, rotation_x, pixel_y, origin_x, origin_y })
     }
     /// Converts pixel-center coordinates (column, row) to map coordinates.
@@ -559,5 +572,7 @@ mod tests {
 
         let overflow = WorldFile::parse("1e308\n0\n0\n-1e308\n0\n0");
         assert!(overflow.is_ok_and(|value| value.image_placement(4, 2).is_err()));
+        assert!(WorldFile::parse("1\n0\n0\n-1\n0\n0\nextra").is_err());
+        assert!(WorldFile::parse(&"1".repeat(4097)).is_err());
     }
 }
