@@ -1,5 +1,6 @@
 //! CSV survey import dialog: paste or open point data, preview it, then add CAD entities.
 
+#[cfg(not(target_arch = "wasm32"))]
 use std::io::Read;
 
 use cadcraft_survey::{
@@ -254,6 +255,7 @@ struct RasterForm {
     error: Option<String>,
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 fn read_world_file(path: &str) -> Result<String, String> {
     let file = std::fs::File::open(path).map_err(|error| format!("Could not open {path}: {error}"))?;
     let mut bytes = Vec::with_capacity(4096);
