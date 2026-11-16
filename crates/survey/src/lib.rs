@@ -418,6 +418,7 @@ impl WorldFile {
     /// stores the lower-left outer corner and a one-pixel-up vector, so this method applies
     /// the half-pixel shift and vertical-axis reversal explicitly. Rotated and sheared grids
     /// are preserved. Near-singular transforms and unreasonable raster dimensions are rejected.
+    /// Coordinates remain in the source world-file CRS; no reprojection is attempted.
     pub fn image_placement(&self, width: u32, height: u32) -> Result<GeoreferencedImagePlacement, SurveyError> {
         const MAX_PIXELS: u64 = 128_000_000;
         let pixels = u64::from(width).checked_mul(u64::from(height)).ok_or(SurveyError::InputTooLarge)?;
