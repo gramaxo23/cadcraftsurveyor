@@ -530,7 +530,7 @@ mod tests {
             spec: GridSpec { columns: 2, rows: 2, origin: Vec2 { x: 0.0, y: 0.0 }, spacing_x: 10.0, spacing_y: 10.0 },
             elevations: vec![Some(12.0); 4],
         };
-        assert_eq!(grid_volume(&grid, 10.0), Ok((2000.0, 0.0)));
+        assert_eq!(grid_volume(&grid, 10.0), Ok((200.0, 0.0)));
         let lines = contours(&grid, 1.0);
         assert!(lines.is_ok());
         assert_eq!(lines.map(|v| v.len()), Ok(0));
