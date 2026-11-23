@@ -111,7 +111,6 @@ impl SurveyCrsMetadata {
     }
 }
 
-
 /// The only coordinate operation currently applied by this crate: a planar affine mapping.
 /// This is deliberately not a projection, geodetic, datum, geoid, or epoch transformation.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -171,9 +170,8 @@ impl CoordinateOperation2D {
         if coefficients.iter().any(|value| !value.is_finite()) {
             return Err(SurveyError::InvalidValue("affine transform coefficients must be finite".into()));
         }
-        let matrix_scale = [self.transform.a, self.transform.b, self.transform.d, self.transform.e]
-            .iter()
-            .fold(0.0_f64, |maximum, value| maximum.max(value.abs()));
+        let matrix_scale =
+            [self.transform.a, self.transform.b, self.transform.d, self.transform.e].iter().fold(0.0_f64, |maximum, value| maximum.max(value.abs()));
         if matrix_scale == 0.0 {
             return Err(SurveyError::DegenerateControls);
         }
@@ -224,7 +222,13 @@ impl CoordinateOperation2D {
         for point in points {
             point.validate()?;
             let mapped = self.map_coordinate_validated(Vec2 { x: point.x, y: point.y })?;
-            output.push(SurveyPoint { number: point.number.clone(), x: mapped.x, y: mapped.y, elevation: point.elevation, description: point.description.clone() });
+            output.push(SurveyPoint {
+                number: point.number.clone(),
+                x: mapped.x,
+                y: mapped.y,
+                elevation: point.elevation,
+                description: point.description.clone(),
+            });
         }
         Ok(output)
     }
