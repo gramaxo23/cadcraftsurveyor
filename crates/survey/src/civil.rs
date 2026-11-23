@@ -3,7 +3,7 @@
 //! This module deliberately stores CRS identifiers and metadata; it does not pretend
 //! to perform datum, geoid, or map-projection transformations. Those require an
 //! authoritative grid/model and a separately validated transformation engine.
-use crate::{SurveyError, Vec2};
+use crate::{Affine2, MAX_POINTS, SurveyError, SurveyPoint, Vec2};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -108,6 +108,125 @@ impl SurveyCrsMetadata {
             return Err(SurveyError::InvalidValue("a grid/ground scale factor requires a declared coordinate use".into()));
         }
         Ok(())
+    }
+}
+
+
+/// The only coordinate operation currently applied by this crate: a planar affine mapping.
+/// This is deliberately not a projection, geodetic, datum, geoid, or epoch transformation.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum CoordinateOperationMethod {
+    Affine2D,
+}
+
+/// Explicit operation metadata. Accuracy is a stated value in metres, not computed or verified.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct CoordinateOperationProvenance {
+    pub name: String,
+    pub operation_id: Option<String>,
+    pub method: CoordinateOperationMethod,
+    pub source_crs: SurveyCrsMetadata,
+    pub target_crs: SurveyCrsMetadata,
+    pub stated_accuracy_m: Option<f64>,
+    pub reference: Option<String>,
+}
+
+/// A planar affine coordinate mapping that carries source/target CRS metadata and provenance.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct CoordinateOperation2D {
+    pub transform: Affine2,
+    pub provenance: CoordinateOperationProvenance,
+}
+
+impl CoordinateOperation2D {
+    /// Validate the operation record and its matrix before it is used.
+    pub fn validate(&self) -> Result<(), SurveyError> {
+        let provenance = &self.provenance;
+        if provenance.name.trim().is_empty() {
+            return Err(SurveyError::InvalidValue("coordinate operation name is required".into()));
+        }
+        if provenance.operation_id.as_ref().is_some_and(|value| value.trim().is_empty())
+            || provenance.reference.as_ref().is_some_and(|value| value.trim().is_empty())
+        {
+            return Err(SurveyError::InvalidValue("coordinate operation identifier and reference cannot be blank".into()));
+        }
+        if provenance.stated_accuracy_m.is_some_and(|value| !value.is_finite() || value <= 0.0) {
+            return Err(SurveyError::InvalidValue("stated operation accuracy must be finite and positive metres".into()));
+        }
+        provenance.source_crs.validate()?;
+        provenance.target_crs.validate()?;
+        if provenance.source_crs.axis_order != AxisOrder::EastingNorthing || provenance.target_crs.axis_order != AxisOrder::EastingNorthing {
+            return Err(SurveyError::InvalidValue("affine coordinate operations require easting/northing axis order in both CRSs".into()));
+        }
+        if provenance.source_crs.coordinate_use == CoordinateUse::Unknown || provenance.target_crs.coordinate_use == CoordinateUse::Unknown {
+            return Err(SurveyError::InvalidValue("affine coordinate operations require declared grid, ground or local coordinate use".into()));
+        }
+        if provenance.source_crs.vertical_unit != provenance.target_crs.vertical_unit {
+            return Err(SurveyError::InvalidValue("this 2D operation preserves elevation and requires matching vertical units".into()));
+        }
+        if provenance.source_crs.coordinate_epoch != provenance.target_crs.coordinate_epoch {
+            return Err(SurveyError::InvalidValue("this static 2D operation cannot change or infer coordinate epochs".into()));
+        }
+        let coefficients = [self.transform.a, self.transform.b, self.transform.c, self.transform.d, self.transform.e, self.transform.f];
+        if coefficients.iter().any(|value| !value.is_finite()) {
+            return Err(SurveyError::InvalidValue("affine transform coefficients must be finite".into()));
+        }
+        let matrix_scale = [self.transform.a, self.transform.b, self.transform.d, self.transform.e]
+            .iter()
+            .fold(0.0_f64, |maximum, value| maximum.max(value.abs()));
+        if matrix_scale == 0.0 {
+            return Err(SurveyError::DegenerateControls);
+        }
+        // Scale the matrix before evaluating its determinant to avoid overflow/underflow.
+        let a = self.transform.a / matrix_scale;
+        let b = self.transform.b / matrix_scale;
+        let d = self.transform.d / matrix_scale;
+        let e = self.transform.e / matrix_scale;
+        let determinant = a * e - b * d;
+        if !determinant.is_finite() || determinant.abs() <= f64::EPSILON * 32.0 {
+            return Err(SurveyError::InvalidValue("affine transform matrix is singular or numerically unstable".into()));
+        }
+        Ok(())
+    }
+
+    fn map_coordinate_validated(&self, coordinate: Vec2) -> Result<Vec2, SurveyError> {
+        if !coordinate.x.is_finite() || !coordinate.y.is_finite() {
+            return Err(SurveyError::InvalidValue("source coordinates must be finite".into()));
+        }
+        let mapped = self.transform.apply(coordinate);
+        if !mapped.x.is_finite() || !mapped.y.is_finite() {
+            return Err(SurveyError::InvalidValue("coordinate operation overflowed".into()));
+        }
+        Ok(mapped)
+    }
+
+    /// Transform one XY coordinate; the caller's coordinate is not modified.
+    pub fn transform_coordinate(&self, coordinate: Vec2) -> Result<Vec2, SurveyError> {
+        self.validate()?;
+        self.map_coordinate_validated(coordinate)
+    }
+
+    /// Transform one survey point, preserving elevation, point number and description.
+    pub fn transform_point(&self, point: &SurveyPoint) -> Result<SurveyPoint, SurveyError> {
+        self.validate()?;
+        point.validate()?;
+        let mapped = self.map_coordinate_validated(Vec2 { x: point.x, y: point.y })?;
+        Ok(SurveyPoint { number: point.number.clone(), x: mapped.x, y: mapped.y, elevation: point.elevation, description: point.description.clone() })
+    }
+
+    /// Transform a bounded point set atomically; no partial output is returned on failure.
+    pub fn transform_points(&self, points: &[SurveyPoint]) -> Result<Vec<SurveyPoint>, SurveyError> {
+        if points.len() > MAX_POINTS {
+            return Err(SurveyError::InputTooLarge);
+        }
+        self.validate()?;
+        let mut output = Vec::with_capacity(points.len());
+        for point in points {
+            point.validate()?;
+            let mapped = self.map_coordinate_validated(Vec2 { x: point.x, y: point.y })?;
+            output.push(SurveyPoint { number: point.number.clone(), x: mapped.x, y: mapped.y, elevation: point.elevation, description: point.description.clone() });
+        }
+        Ok(output)
     }
 }
 
@@ -620,5 +739,100 @@ mod tests {
         let areas = section.area_to_datum(10.0);
         assert!(areas.is_ok());
         assert!(areas.is_ok_and(|(cut, fill)| (cut - 5.0).abs() < 1e-9 && (fill - 5.0).abs() < 1e-9));
+    }
+}
+
+#[cfg(test)]
+mod coordinate_operation_tests {
+    use super::*;
+
+    fn crs(name: &str, epoch: Option<f64>, vertical_unit: LinearUnit) -> SurveyCrsMetadata {
+        SurveyCrsMetadata {
+            authority: None,
+            code: None,
+            name: name.into(),
+            datum: Some("Test datum".into()),
+            projection: Some("Test projection".into()),
+            geoid_model: None,
+            coordinate_epoch: epoch,
+            horizontal_unit: LinearUnit::Metre,
+            vertical_unit,
+            axis_order: AxisOrder::EastingNorthing,
+            coordinate_use: CoordinateUse::Grid,
+            combined_scale_factor: None,
+        }
+    }
+
+    fn operation() -> CoordinateOperation2D {
+        CoordinateOperation2D {
+            transform: Affine2 { a: 2.0, b: 0.0, c: 10.0, d: 0.0, e: 3.0, f: -5.0 },
+            provenance: CoordinateOperationProvenance {
+                name: "User-defined affine control fit".into(),
+                operation_id: Some("LOCAL-CTRL-01".into()),
+                method: CoordinateOperationMethod::Affine2D,
+                source_crs: crs("Local engineering coordinates", None, LinearUnit::Metre),
+                target_crs: crs("Project grid", None, LinearUnit::Metre),
+                stated_accuracy_m: Some(0.02),
+                reference: Some("Independent control check".into()),
+            },
+        }
+    }
+
+    #[test]
+    fn affine_operation_maps_xy_and_preserves_point_metadata_and_elevation() {
+        let source = SurveyPoint { number: "101".into(), x: 1.0, y: 2.0, elevation: 7.5, description: "BM".into() };
+        let transformed = operation().transform_point(&source);
+        assert_eq!(transformed, Ok(SurveyPoint { number: "101".into(), x: 12.0, y: 1.0, elevation: 7.5, description: "BM".into() }));
+        assert_eq!(source.x, 1.0);
+        assert_eq!(source.y, 2.0);
+    }
+
+    #[test]
+    fn operation_provenance_serializes_and_batch_transform_is_atomic() {
+        let operation = operation();
+        assert!(operation.validate().is_ok());
+        let points = [
+            SurveyPoint { number: "1".into(), x: 0.0, y: 0.0, elevation: 10.0, description: "A".into() },
+            SurveyPoint { number: "2".into(), x: 1.0, y: 2.0, elevation: 20.0, description: "B".into() },
+        ];
+        let result = operation.transform_points(&points);
+        assert!(result.is_ok_and(|mapped| mapped.len() == 2 && mapped.get(1).is_some_and(|point| point.x == 12.0 && point.y == 1.0)));
+        let invalid = [points[0].clone(), SurveyPoint { number: "".into(), x: 3.0, y: 4.0, elevation: 0.0, description: String::new() }];
+        assert!(operation.transform_points(&invalid).is_err());
+        let encoded = serde_json::to_string(&operation);
+        assert!(encoded.is_ok());
+        assert!(encoded.is_ok_and(|json| json.contains("LOCAL-CTRL-01") && json.contains("0.02")));
+    }
+
+    #[test]
+    fn affine_operation_rejects_epoch_vertical_axis_accuracy_and_singular_matrix() {
+        let mut value = operation();
+        value.provenance.target_crs.coordinate_epoch = Some(2020.0);
+        assert!(value.validate().is_err());
+
+        value = operation();
+        value.provenance.target_crs.vertical_unit = LinearUnit::Millimetre;
+        assert!(value.validate().is_err());
+
+        value = operation();
+        value.provenance.target_crs.axis_order = AxisOrder::NorthingEasting;
+        assert!(value.validate().is_err());
+
+        value = operation();
+        value.provenance.stated_accuracy_m = Some(0.0);
+        assert!(value.validate().is_err());
+
+        value = operation();
+        value.transform = Affine2 { a: 1.0, b: 1.0, c: 0.0, d: 1.0, e: 1.0, f: 0.0 };
+        assert!(value.validate().is_err());
+    }
+
+    #[test]
+    fn affine_operation_rejects_non_finite_coordinates_and_output_overflow() {
+        let value = operation();
+        assert!(value.transform_coordinate(Vec2 { x: f64::NAN, y: 0.0 }).is_err());
+        let mut extreme = operation();
+        extreme.transform = Affine2 { a: 2.0, b: 0.0, c: f64::MAX, d: 0.0, e: 3.0, f: 0.0 };
+        assert!(extreme.transform_coordinate(Vec2 { x: f64::MAX, y: 0.0 }).is_err());
     }
 }
