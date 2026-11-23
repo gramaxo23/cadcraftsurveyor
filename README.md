@@ -134,7 +134,7 @@ validated survey adjustment package or a complete Civil 3D workflow**.
 |---|---|
 | Survey point data | Import PNEZD, PENZD and XYZ CSV; validate identifiers and finite coordinates; preview points before desktop import; export PNEZD CSV; group points by the first description code |
 | COGO and traverse | Direct and inverse calculations, whole-circle azimuths, infinite-line intersections, traverse closure diagnostics and Bowditch (compass-rule) adjustment |
-| Coordinate handling | Linear, area and volume unit conversions; separate international-foot and US-survey-foot definitions; CRS metadata validation; 2D affine fit from three controls; redundant unweighted 2D similarity fit with residual, RMS and maximum-residual reporting |
+| Coordinate handling | Linear, area and volume unit conversions; separate international-foot and US-survey-foot definitions; CRS metadata validation; 2D affine fit from three controls; provenance-carrying affine XY operation with stated accuracy/reference; redundant unweighted 2D similarity fit with residual, RMS and maximum-residual reporting |
 | Parcels | Validated parcel boundaries from ordered survey points; stable area/perimeter/centroid; point-in-polygon; edge azimuth/distance schedules; atomic vertex insert/move/remove; closed native 3D parcel polylines |
 | Terrain | Bounded Bowyer–Watson TIN, scale-independent elevation queries, deduplicated contour segments and branch-aware contour polylines; regular elevation grids and grid-based cut/fill |
 | Civil geometry | Horizontal alignment station/offset calculations, station equations, linear vertical-profile interpolation and grade calculations |
@@ -193,8 +193,7 @@ The current survey functionality is an engineering foundation and supervised eva
 prototype. It must not be used as the sole basis for cadastral/legal boundary certification,
 unsupervised construction setting-out, or payment quantities. In particular:
 
-- CRS metadata can be represented and validated, but authoritative datum, projection, geoid and
-  coordinate-epoch transformations are not implemented or automatically applied.
+- CRS metadata can be represented and validated, and an explicit static 2D affine operation can record source/target metadata, method, stated accuracy and reference. It preserves Z and requires matching vertical units and epoch metadata; authoritative projection, datum, geoid, vertical and epoch transformations are not implemented or automatically applied.
 - The redundant similarity fit is unweighted and 2D; it is not a least-squares geodetic network
   adjustment and does not provide covariance or statistical outlier tests.
 - The TIN is bounded to 5,000 points and uses floating-point predicates; contour generation is
