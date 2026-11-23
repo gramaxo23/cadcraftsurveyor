@@ -696,7 +696,7 @@ mod tests {
         let points = [p("1", 0.0, 0.0, 0.0), p("2", 10.0, 0.0, 10.0), p("3", 0.0, 10.0, 20.0), p("4", 10.0, 10.0, 30.0)];
         let model = Tin::from_points(&points).unwrap_or_else(|_| Tin { vertices: Vec::new(), triangles: Vec::new() });
         let z = model.elevation_at(Vec2 { x: 2.0, y: 2.0 });
-        assert!(z.ok().flatten().is_some_and(|value| (value - 8.0).abs() < 1.0e-8));
+        assert!(z.ok().flatten().is_some_and(|value| (value - 6.0).abs() < 1.0e-8));
     }
 
     #[test]
