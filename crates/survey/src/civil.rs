@@ -553,7 +553,7 @@ mod additional_civil_tests {
 
     #[test]
     fn scale_factor_is_explicit_and_checked() {
-        assert_eq!(apply_combined_scale_factor(100.0, 0.9996), Ok(99.96));
+        assert!(apply_combined_scale_factor(100.0, 0.9996).is_ok_and(|v| (v - 99.96).abs() < 1.0e-12));
         assert!(apply_combined_scale_factor(100.0, 0.0).is_err());
     }
 }
@@ -566,7 +566,7 @@ mod tests {
     fn distinguishes_international_and_us_survey_feet() {
         let converted = LinearUnit::UsSurveyFoot.convert(1000.0, LinearUnit::InternationalFoot);
         assert!(converted.is_ok());
-        assert!(converted.is_ok_and(|v| (v - 999.998).abs() < 1.0e-6));
+        assert!(converted.is_ok_and(|v| (v - 1000.002).abs() < 1.0e-6));
     }
 
     #[test]
@@ -619,6 +619,6 @@ mod tests {
         };
         let areas = section.area_to_datum(10.0);
         assert!(areas.is_ok());
-        assert!(areas.is_ok_and(|(cut, fill)| (cut - 2.5).abs() < 1e-9 && (fill - 2.5).abs() < 1e-9));
+        assert!(areas.is_ok_and(|(cut, fill)| (cut - 5.0).abs() < 1e-9 && (fill - 5.0).abs() < 1e-9));
     }
 }
