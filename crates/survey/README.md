@@ -15,7 +15,7 @@ tested separately and reused by desktop, CLI, MCP and other future clients.
 | Point data | `import_points_csv`, `PointFormat`, `SurveyPoint`, `export_pnezd_csv`, `group_points_by_code` |
 | COGO | `cogo`: direct/inverse calculations, azimuths, infinite-line intersection and traverse closure diagnostics |
 | Traverse adjustment | `cogo::adjustment`: Bowditch/compass-rule adjustment |
-| Units and CRS metadata | `civil::LinearUnit`, `SurveyCrsMetadata`, axis order and coordinate-use metadata, explicit scale-factor helper |
+| Units and CRS metadata | `civil::LinearUnit`, `SurveyCrsMetadata`, axis order and coordinate-use metadata, explicit scale-factor helper; `CoordinateOperation2D` with source/target metadata, method, stated accuracy and reference |
 | Control fit | Existing three-control affine fit plus redundant unweighted 2D similarity fit with residuals, RMS and maximum residual |
 | Parcels | `ParcelBoundary`, stable area/perimeter/centroid metrics, point-in-polygon classification, edge bearings/distances, atomic vertex insert/move/remove, text edge schedule report; `parcel_area`, `parcel_perimeter` |
 | Terrain | `Tin`: bounded triangulation, scale-independent elevation queries, deduplicated contour segments, branch-aware contour polylines and regular-grid cut/fill |
@@ -44,6 +44,13 @@ horizontal and vertical units, axis order, grid/ground/local use and an optional
 factor. Validation checks metadata consistency; it does **not** resolve EPSG definitions or perform
 datum, projection, geoid or epoch transformations. A scale-factor helper does not decide the
 grid-to-ground convention for the operator.
+
+`CoordinateOperation2D` applies an explicitly supplied planar affine XY matrix and records its
+source and target metadata, method, optional operation identifier/reference and optional stated
+accuracy (metres). The accuracy is provenance only; it is not calculated or independently
+verified. The operation preserves elevation and therefore requires matching vertical units, EN
+axis order, declared coordinate use and identical epoch metadata. It cannot change epochs, apply
+geoid or vertical corrections, or replace an authoritative projection/datum transformation.
 
 ## Desktop point import
 
