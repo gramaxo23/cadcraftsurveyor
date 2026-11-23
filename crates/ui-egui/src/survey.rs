@@ -76,7 +76,7 @@ fn build_survey_drawing(form: &Form) -> Result<SurveyDrawing, SurveyError> {
 
 /// Show the import dialog. Parsing is previewed before the engine is allowed to modify the drawing.
 pub fn dialog(app: &mut CadApp, ctx: &egui::Context, open: &mut bool) {
-    let id = egui::Id::new("cadcraft_survey_csv_import");
+    let id = egui::Id::unique("cadcraft_survey_csv_import");
     let mut form = ctx.data(|data| data.get_temp::<Form>(id)).unwrap_or_default();
     let mut do_import = false;
     let mut close_requested = false;
@@ -270,7 +270,7 @@ fn read_world_file(path: &str) -> Result<String, String> {
 
 /// Attach an image as a native IMAGE entity using an explicit six-line world file.
 pub fn raster_dialog(app: &mut CadApp, ctx: &egui::Context, open: &mut bool) {
-    let id = egui::Id::new("cadcraft_survey_georeferenced_raster");
+    let id = egui::Id::unique("cadcraft_survey_georeferenced_raster");
     let mut form = ctx.data(|data| data.get_temp::<RasterForm>(id)).unwrap_or_default();
     let mut do_attach = false;
     let mut close_requested = false;
